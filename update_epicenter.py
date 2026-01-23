@@ -4,6 +4,23 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 import shutil
 
+# ================== TELEGRAM ==================
+TG_BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"
+TG_CHAT_ID = "PASTE_YOUR_CHAT_ID_HERE"
+
+LOG = []
+
+def log(msg):
+    print(msg)
+    LOG.append(msg)
+
+def send_telegram(message: str):
+    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
+    requests.post(url, data={
+        "chat_id": TG_CHAT_ID,
+        "text": message
+    }, timeout=20)
+
 # ================== НАСТРОЙКИ ==================
 ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
 EPICENTER_URL = "https://aqua-favorit.com.ua/content/export/e8965786f1dc7b09ba9950b66c9f7fba.xml"
@@ -22,41 +39,37 @@ BANNED_VENDORS = {
 }
 
 BANNED_CATEGORY_ROOTS = {
-    "1276",
-    "1278",
-    "1157",
-    "1252",
-    "1251",
-    "1199",
-    "1161",
+    "1276", "1278", "1157", "1252",
+    "1251", "1199", "1161",
 }
 
 # ================== СКАЧИВАНИЕ ==================
 def download_file(url, path, title, retries=5, timeout=180):
-    print(f"▶ Загрузка: {title}")
-    for attempt in range(1, retries + 1):
+    log(f"▶ Загрузка: {title}")
+    for _ in range(retries):
         try:
             with requests.get(url, stream=True, timeout=timeout) as r:
                 r.raise_for_status()
                 with open(path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024*1024):
+                    for chunk in r.iter_content(1024 * 1024):
                         if chunk:
                             f.write(chunk)
-            print(f"  ✅ {title} загружен\n")
+            log(f"  ✅ {title} загружен\n")
             return
         except Exception as e:
-            print(f"  ⚠ Ошибка: {e}")
-            if attempt == retries:
-                raise
             time.sleep(5)
+    raise RuntimeError(f"Не удалось загрузить {title}")
 
-print("\n===== СТАРТ =====\n")
+# ================== СТАРТ ==================
+log("===== СТАРТ =====\n")
+
 download_file(ROZETKA_URL, ROZETKA_XML, "Розетка XML")
 download_file(EPICENTER_URL, EPICENTER_XML, "Эпицентр XML")
 
 # ================== РОЗЕТКА ==================
 rozetka_data = {}
 tree_r = ET.parse(ROZETKA_XML)
+
 for offer in tree_r.getroot().findall(".//offer"):
     rid = offer.get("id")
     if rid:
@@ -70,7 +83,6 @@ for offer in tree_r.getroot().findall(".//offer"):
 tree = ET.parse(EPICENTER_XML)
 root = tree.getroot()
 
-# --- строим карту категорий ---
 category_parent = {}
 for cat in root.findall(".//category"):
     cid = cat.get("id")
@@ -78,7 +90,7 @@ for cat in root.findall(".//category"):
     if cid and pid:
         category_parent[cid] = pid
 
-def is_banned_category(cid: str) -> bool:
+def is_banned_category(cid):
     while cid:
         if cid in BANNED_CATEGORY_ROOTS:
             return True
@@ -88,7 +100,7 @@ def is_banned_category(cid: str) -> bool:
 offers = root.findall(".//offer")
 removed = 0
 
-for offer in offers:
+for offer in offers[:]:
     vendor = offer.findtext("vendor", "").strip()
     category_id = offer.findtext("categoryId", "").strip()
 
@@ -98,15 +110,8 @@ for offer in offers:
         continue
 
     vendor_code = offer.findtext("vendorCode", "").strip()
-    if not vendor_code:
-        continue
-
-    param_artikul = offer.find(".//param[@name='Артикул']")
-    if param_artikul is not None and param_artikul.text:
-        offer_id = param_artikul.text.strip()
-    else:
-        offer_id = vendor_code
-
+    param = offer.find(".//param[@name='Артикул']")
+    offer_id = param.text.strip() if param is not None and param.text else vendor_code
     offer.set("id", offer_id)
 
     if offer_id in rozetka_data:
@@ -114,20 +119,18 @@ for offer in offers:
         if data["price"]:
             offer.find("price").text = data["price"]
         if data["old_price"]:
-            old = offer.find("oldprice") or ET.SubElement(offer, "oldprice")
-            old.text = data["old_price"]
+            (offer.find("oldprice") or ET.SubElement(offer, "oldprice")).text = data["old_price"]
         offer.set("available", data["available"])
 
-# 🔹 ВОТ ЗДЕСЬ ДОБАВЛЕНО
 remaining = len(root.findall(".//offer"))
 
-print(f"❌ Удалено из файла (левых) товаров: {removed}")
-print(f"📦 Отправляем на Эпицентр товаров: {remaining}")
+log(f"❌ Удалено из файла (левых) товаров: {removed}")
+log(f"📦 Отправляем на Эпицентр товаров: {remaining}")
+log("===== ГОТОВО ✅ =====")
 
 # ================== СОХРАНЕНИЕ ==================
 tree.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
+shutil.copy2(OUTPUT_XML, Path.cwd() / "update_epicenter.xml")
 
-REPO_ROOT = Path.cwd()
-shutil.copy2(OUTPUT_XML, REPO_ROOT / "update_epicenter.xml")
-
-print("===== ГОТОВО ✅ =====")
+# ================== TELEGRAM ==================
+send_telegram("\n".join(LOG))
