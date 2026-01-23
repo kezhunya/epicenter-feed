@@ -2,7 +2,10 @@ name: Update Epicenter XML
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # каждый день в 6:00 UTC
+    - cron: '0 0 * * *'   # 00:00 UTC
+    - cron: '0 9 * * *'   # 09:00 UTC
+    - cron: '0 13 * * *'  # 13:00 UTC
+    - cron: '0 20 * * *'  # 20:00 UTC
   workflow_dispatch:      # можно запускать вручную
 
 jobs:
