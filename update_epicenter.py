@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import xml.etree.ElementTree as ET
@@ -32,10 +33,13 @@ BANNED_CATEGORY_ROOTS = {
 }
 
 # ================== TELEGRAM ==================
-TG_BOT_TOKEN = "8069235279:AAHCkOEDG3T0lt7p-NWZ-w_2BxqbNPJhRj4"
-TG_CHAT_ID = "599189949"
+TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 def send_telegram(message: str):
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        print("⚠ TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID не задан. Сообщение не отправлено.")
+        return
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TG_CHAT_ID,
@@ -155,5 +159,4 @@ message = f"""===== СТАРТ =====
 ===== ГОТОВО ✅ ====="""
 
 send_telegram(message)
-
 print(message)
