@@ -2,61 +2,41 @@ name: Update Epicenter XML
 
 on:
   schedule:
-    - cron: '0 * * * *'   # каждый час
-  workflow_dispatch:
+    # cron в UTC, Украина = UTC+2 (зимой), +3 (летом)
+    # для простоты берём зимнее время UTC+2
+    - cron: '22 22 * * *'  # 0:00 Украина = 22:00 UTC (предыдущий день)
+    - cron: '7 7 * * *'    # 09:00 Украина = 07:00 UTC
+    - cron: '11 11 * * *'  # 13:00 Украина = 11:00 UTC
+    - cron: '18 18 * * *'  # 20:00 Украина = 18:00 UTC
+  workflow_dispatch:      # можно запускать вручную
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check Kyiv time
-        id: timecheck
-        run: |
-          HOUR=$(TZ=Europe/Kyiv date +%H)
-          MIN=$(TZ=Europe/Kyiv date +%M)
-          echo "Kyiv time: $HOUR:$MIN"
-
-          if [[ "$MIN" != "00" ]]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          case "$HOUR" in
-            00|09|13|20)
-              echo "skip=false" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "skip=true" >> $GITHUB_OUTPUT
-              ;;
-          esac
-
       - name: Checkout repository
-        if: steps.timecheck.outputs.skip == 'false'
         uses: actions/checkout@v3
+        with:
+          persist-credentials: true  # чтобы git push работал
 
       - name: Setup Python
-        if: steps.timecheck.outputs.skip == 'false'
         uses: actions/setup-python@v4
         with:
           python-version: 3.13
 
       - name: Install dependencies
-        if: steps.timecheck.outputs.skip == 'false'
         run: |
           python -m pip install --upgrade pip
           pip install requests
 
       - name: Run update_epicenter.py
-        if: steps.timecheck.outputs.skip == 'false'
         run: python update_epicenter.py
 
       - name: Copy updated XML to repo root
-        if: steps.timecheck.outputs.skip == 'false'
         run: cp /tmp/epicenter_feed/update_epicenter.xml ./update_epicenter.xml
 
       - name: Commit and push changes
-        if: steps.timecheck.outputs.skip == 'false'
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
