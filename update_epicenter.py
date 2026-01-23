@@ -61,40 +61,43 @@ print(f"  ✅ Розетка: {len(rozetka_data)} товаров\n")
 print("▶ Парсинг Эпицентр и обновление...")
 tree = ET.parse(EPICENTER_XML)
 root = tree.getroot()
-offers = root.findall(".//offer")
 
+offers = root.findall(".//offer")
 for offer in offers:
     vendor_code = offer.findtext("vendorCode", "").strip()
     if not vendor_code:
         continue
 
-    # ===== Проверка param name="Артикул" =====
+    # Проверяем param name="Артикул"
     param_artikul = offer.find(".//param[@name='Артикул']")
-    if param_artikul is not None:
-        artikul_value = param_artikul.text.strip()
-        if artikul_value != vendor_code:
-            offer.set("id", artikul_value)
-        else:
-            offer.set("id", vendor_code)
+    if param_artikul is not None and param_artikul.text.strip() != vendor_code:
+        new_id = param_artikul.text.strip()
     else:
-        offer.set("id", vendor_code)
+        new_id = vendor_code
+
+    offer.set("id", new_id)
 
     # ===== Подставляем данные из Розетки =====
-    rozetka_info = rozetka_data.get(vendor_code)
-    if rozetka_info:
+    if vendor_code in rozetka_data:
+        rozetka_info = rozetka_data[vendor_code]
+
         # available
         offer.set("available", rozetka_info["available"])
-        # price
+
+        # price — всегда из Розетки
         price_el = offer.find("price")
-        if price_el is not None:
-            price_el.text = rozetka_info["price"]
-        # oldprice — создаём только если есть
-        oldprice_el = offer.find("oldprice")
+        if price_el is None:
+            price_el = ET.SubElement(offer, "price")
+        price_el.text = rozetka_info["price"]
+
+        # oldprice — только если есть
         if rozetka_info["old_price"]:
+            oldprice_el = offer.find("oldprice")
             if oldprice_el is None:
                 oldprice_el = ET.SubElement(offer, "oldprice")
             oldprice_el.text = rozetka_info["old_price"]
         else:
+            oldprice_el = offer.find("oldprice")
             if oldprice_el is not None:
                 offer.remove(oldprice_el)
 
