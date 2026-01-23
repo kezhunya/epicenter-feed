@@ -2,13 +2,12 @@ name: Update Epicenter XML
 
 on:
   schedule:
-    # cron в UTC, Украина = UTC+2 (зимой), +3 (летом)
-    # для простоты берём зимнее время UTC+2
-    - cron: '22 22 * * *'  # 0:00 Украина = 22:00 UTC (предыдущий день)
-    - cron: '7 7 * * *'    # 09:00 Украина = 07:00 UTC
-    - cron: '11 11 * * *'  # 13:00 Украина = 11:00 UTC
-    - cron: '18 18 * * *'  # 20:00 Украина = 18:00 UTC
-  workflow_dispatch:      # можно запускать вручную
+    # Время по Европе/Киеву: 0:00, 09:00, 13:00, 20:00
+    - cron: '0 22 * * *'   # 00:00 Kyiv = 22:00 UTC предыдущего дня
+    - cron: '0 7 * * *'    # 09:00 Kyiv = 07:00 UTC
+    - cron: '0 11 * * *'   # 13:00 Kyiv = 11:00 UTC
+    - cron: '0 18 * * *'   # 20:00 Kyiv = 18:00 UTC
+  workflow_dispatch:      # возможность запускать вручную
 
 jobs:
   build:
@@ -17,8 +16,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          persist-credentials: true  # чтобы git push работал
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -33,10 +30,7 @@ jobs:
       - name: Run update_epicenter.py
         run: python update_epicenter.py
 
-      - name: Copy updated XML to repo root
-        run: cp /tmp/epicenter_feed/update_epicenter.xml ./update_epicenter.xml
-
-      - name: Commit and push changes
+      - name: Commit and push updated XML
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
