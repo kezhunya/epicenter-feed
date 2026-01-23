@@ -63,24 +63,40 @@ tree = ET.parse(EPICENTER_XML)
 root = tree.getroot()
 
 offers = root.findall(".//offer")
+updated_count = 0
+
 for offer in offers:
     vendor_code = offer.findtext("vendorCode", "").strip()
     if not vendor_code:
         continue
 
-    # ===== Заменяем id на vendorCode =====
-    offer.set("id", vendor_code)
+    # ===== Проверяем param "Артикул" =====
+    param_artikul = None
+    for param in offer.findall("param"):
+        if param.get("name") == "Артикул":
+            param_artikul = param.text.strip()
+            break
+
+    # ===== Определяем id =====
+    if param_artikul and param_artikul != vendor_code:
+        offer_id = param_artikul
+    else:
+        offer_id = vendor_code
+
+    # ===== Меняем id =====
+    offer.set("id", offer_id)
 
     # ===== Подставляем данные из Розетки =====
-    if vendor_code in rozetka_data:
-        r = rozetka_data[vendor_code]
+    if offer_id in rozetka_data:
+        r = rozetka_data[offer_id]
         if offer.find("price") is not None:
             offer.find("price").text = r["price"]
         if offer.find("oldprice") is not None:
             offer.find("oldprice").text = r["old_price"]
         offer.set("available", r["available"])
+        updated_count += 1
 
-print(f"  ✅ Эпицентр обновлён: {len(offers)} товаров\n")
+print(f"  ✅ Эпицентр обновлён: {len(offers)} товаров, {updated_count} товаров совпали с Розеткой\n")
 
 # ================== СОХРАНЕНИЕ ==================
 tree.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
