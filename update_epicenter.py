@@ -78,24 +78,31 @@ for offer in offers:
     else:
         offer.set("id", vendor_code)
 
-    # ===== Подставляем данные из Розетки =====
+    # ===== Подставляем данные из Розетки (только при совпадении) =====
     lookup_id = offer.get("id")
     if lookup_id in rozetka_data:
         data = rozetka_data[lookup_id]
+
+        # Цена
         if data["price"]:
             price_el = offer.find("price")
             if price_el is not None:
                 price_el.text = data["price"]
+
+        # Старая цена (oldprice)
         if data["old_price"]:
             oldprice_el = offer.find("oldprice")
             if oldprice_el is not None:
                 oldprice_el.text = data["old_price"]
             else:
-                # Если тега oldprice нет, создаем его
                 oldprice_el = ET.SubElement(offer, "oldprice")
                 oldprice_el.text = data["old_price"]
+
         # Наличие
         offer.set("available", data["available"])
+    else:
+        # Если совпадений нет — оставляем исходные price, oldprice, available
+        pass
 
 print(f"  ✅ Эпицентр обновлён: {len(offers)} товаров\n")
 
