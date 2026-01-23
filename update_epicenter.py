@@ -118,7 +118,8 @@ for offer in offers:
             old.text = data["old_price"]
         offer.set("available", data["available"])
 
-print(f"❌ Удалено товаров: {removed}")
+print(f"❌ Удалено из файла (левых) товаров: {removed}")
+print(f"📦 Отправляем на Эпицентр товаров: {remaining_offers}")
 
 # ================== СОХРАНЕНИЕ ==================
 tree.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
