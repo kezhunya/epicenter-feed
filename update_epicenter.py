@@ -6,7 +6,7 @@ import shutil
 
 # ================== НАСТРОЙКИ ==================
 ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
-EPICENTER_URL = "https://aqua-favorit.com.ua/content/export/7a16de3b4a426940e529447a293728c9.xml"
+EPICENTER_URL = "https://aqua-favorit.com.ua/content/export/e8965786f1dc7b09ba9950b66c9f7fba.xml"
 
 TMP_DIR = Path("/tmp/epicenter_feed")
 TMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -15,12 +15,27 @@ ROZETKA_XML = TMP_DIR / "rozetka.xml"
 EPICENTER_XML = TMP_DIR / "epicenter.xml"
 OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
 
-# ================== СКАЧИВАНИЕ ФАЙЛОВ ==================
+# ===== ЧЁРНЫЕ СПИСКИ =====
+BANNED_VENDORS = {
+    "Ariston", "Atlant", "Bosch", "Bradas", "Franke",
+    "Mexen", "Neon", "NoName", "TeploCeramic", "Yoka", "Новая Вода"
+}
+
+BANNED_CATEGORY_ROOTS = {
+    "1276",  # Декоративные панели
+    "1278",  # Обратные клапана
+    "1157",  # Душевые кабины / Комплектующие
+    "1252",  # Средства герметизации
+    "1251",  # Трубы водопроводные
+    "1199",  # Фильтры / Комплектующие
+    "1161",  # Раковины / Комплектующие
+}
+
+# ================== СКАЧИВАНИЕ ==================
 def download_file(url, path, title, retries=5, timeout=180):
     print(f"▶ Загрузка: {title}")
     for attempt in range(1, retries + 1):
         try:
-            print(f"  ⏳ Попытка {attempt}")
             with requests.get(url, stream=True, timeout=timeout) as r:
                 r.raise_for_status()
                 with open(path, "wb") as f:
@@ -35,86 +50,80 @@ def download_file(url, path, title, retries=5, timeout=180):
                 raise
             time.sleep(5)
 
-print("\n===== СТАРТ СКРИПТА =====\n")
+print("\n===== СТАРТ =====\n")
 download_file(ROZETKA_URL, ROZETKA_XML, "Розетка XML")
 download_file(EPICENTER_URL, EPICENTER_XML, "Эпицентр XML")
 
-# ================== ПАРСИНГ РОЗЕТКА ==================
-print("▶ Парсинг Розетка...")
+# ================== РОЗЕТКА ==================
 rozetka_data = {}
-tree_rozetka = ET.parse(ROZETKA_XML)
-root_rozetka = tree_rozetka.getroot()
-
-for offer in root_rozetka.findall(".//offer"):
+tree_r = ET.parse(ROZETKA_XML)
+for offer in tree_r.getroot().findall(".//offer"):
     rid = offer.get("id")
-    if not rid:
-        continue
-    rozetka_data[rid.strip()] = {
-        "price": offer.findtext("price", "").strip(),
-        "old_price": offer.findtext("oldprice", "").strip(),
-        "available": offer.get("available", "").strip()
-    }
+    if rid:
+        rozetka_data[rid.strip()] = {
+            "price": offer.findtext("price", "").strip(),
+            "old_price": offer.findtext("oldprice", "").strip(),
+            "available": offer.get("available", "").strip()
+        }
 
-print(f"  ✅ Розетка: {len(rozetka_data)} товаров\n")
-
-# ================== ПАРСИНГ ЭПИЦЕНТР ==================
-print("▶ Парсинг Эпицентр и обновление...")
+# ================== ЭПИЦЕНТР ==================
 tree = ET.parse(EPICENTER_XML)
 root = tree.getroot()
 
+# --- строим карту категорий ---
+category_parent = {}
+for cat in root.findall(".//category"):
+    cid = cat.get("id")
+    pid = cat.get("parentId")
+    if cid and pid:
+        category_parent[cid] = pid
+
+def is_banned_category(cid: str) -> bool:
+    while cid:
+        if cid in BANNED_CATEGORY_ROOTS:
+            return True
+        cid = category_parent.get(cid)
+    return False
+
 offers = root.findall(".//offer")
+removed = 0
+
 for offer in offers:
+    vendor = offer.findtext("vendor", "").strip()
+    category_id = offer.findtext("categoryId", "").strip()
+
+    if vendor in BANNED_VENDORS or is_banned_category(category_id):
+        root.find(".//offers").remove(offer)
+        removed += 1
+        continue
+
     vendor_code = offer.findtext("vendorCode", "").strip()
     if not vendor_code:
         continue
 
-    # ===== Определяем id =====
     param_artikul = offer.find(".//param[@name='Артикул']")
-    if param_artikul is not None:
-        artikul_value = param_artikul.text.strip()
-        if artikul_value and artikul_value != vendor_code:
-            offer_id = artikul_value
-        else:
-            offer_id = vendor_code
+    if param_artikul is not None and param_artikul.text:
+        offer_id = param_artikul.text.strip()
     else:
         offer_id = vendor_code
 
     offer.set("id", offer_id)
 
-    # ===== Подставляем данные из Розетки =====
-    # Ищем по итоговому id
     if offer_id in rozetka_data:
         data = rozetka_data[offer_id]
-        # Price
         if data["price"]:
-            price_el = offer.find("price")
-            if price_el is not None:
-                price_el.text = data["price"]
-        # Oldprice
+            offer.find("price").text = data["price"]
         if data["old_price"]:
-            oldprice_el = offer.find("oldprice")
-            if oldprice_el is not None:
-                oldprice_el.text = data["old_price"]
-            else:
-                oldprice_el = ET.SubElement(offer, "oldprice")
-                oldprice_el.text = data["old_price"]
-        # Available
+            old = offer.find("oldprice") or ET.SubElement(offer, "oldprice")
+            old.text = data["old_price"]
         offer.set("available", data["available"])
-    # Если совпадений нет — оставляем price, oldprice, available как есть
 
-print(f"  ✅ Эпицентр обновлён: {len(offers)} товаров\n")
+print(f"❌ Удалено товаров: {removed}")
 
 # ================== СОХРАНЕНИЕ ==================
 tree.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
-print(f"▶ XML сохранён во временной папке: {OUTPUT_XML}")
 
-# Копируем файл сразу в корень репозитория для GitHub Actions
 REPO_ROOT = Path.cwd()
 shutil.copy2(OUTPUT_XML, REPO_ROOT / "update_epicenter.xml")
-print(f"▶ XML скопирован в репозиторий: {REPO_ROOT / 'update_epicenter.xml'}")
 
-# ================== ОЧИСТКА ==================
-ROZETKA_XML.unlink(missing_ok=True)
-EPICENTER_XML.unlink(missing_ok=True)
-
-print("===== ФАЙЛ ЭПИЦЕНТР готов !! =====")
+print("===== ГОТОВО ✅ =====")
