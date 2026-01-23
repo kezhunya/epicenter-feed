@@ -1,0 +1,33 @@
+name: Update Epicenter XML
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # каждый день в 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.13"
+
+    - name: Install dependencies
+      run: pip install requests
+
+    - name: Run update script
+      run: python update_epicenter.py
+
+    - name: Commit and Push XML
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "actions@github.com"
+        mv /tmp/epicenter.xml epicenter.xml
+        git add epicenter.xml
+        git commit -m "Update epicenter.xml" || echo "No changes"
+        git push
