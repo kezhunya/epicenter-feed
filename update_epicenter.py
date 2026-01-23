@@ -2,17 +2,18 @@ import requests
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+import shutil
 
 # ================== НАСТРОЙКИ ==================
 ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
 EPICENTER_URL = "https://aqua-favorit.com.ua/content/export/7a16de3b4a426940e529447a293728c9.xml"
 
-SAVE_DIR = Path("/tmp/epicenter_feed")
-SAVE_DIR.mkdir(parents=True, exist_ok=True)
+TMP_DIR = Path("/tmp/epicenter_feed")
+TMP_DIR.mkdir(parents=True, exist_ok=True)
 
-ROZETKA_XML = SAVE_DIR / "rozetka.xml"
-EPICENTER_XML = SAVE_DIR / "epicenter.xml"
-OUTPUT_XML = SAVE_DIR / "update_epicenter.xml"
+ROZETKA_XML = TMP_DIR / "rozetka.xml"
+EPICENTER_XML = TMP_DIR / "epicenter.xml"
+OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
 
 # ================== СКАЧИВАНИЕ ФАЙЛОВ ==================
 def download_file(url, path, title, retries=5, timeout=180):
@@ -72,24 +73,23 @@ for offer in offers:
     if param_artikul is not None:
         artikul_value = param_artikul.text.strip()
         if artikul_value and artikul_value != vendor_code:
-            offer.set("id", artikul_value)
+            offer_id = artikul_value
         else:
-            offer.set("id", vendor_code)
+            offer_id = vendor_code
     else:
-        offer.set("id", vendor_code)
+        offer_id = vendor_code
 
-    # ===== Подставляем данные из Розетки (только при совпадении) =====
-    lookup_id = offer.get("id")
-    if lookup_id in rozetka_data:
-        data = rozetka_data[lookup_id]
+    offer.set("id", offer_id)
 
-        # Цена
+    # ===== Подставляем данные из Розетки =====
+    if vendor_code in rozetka_data:
+        data = rozetka_data[vendor_code]
+        # Price
         if data["price"]:
             price_el = offer.find("price")
             if price_el is not None:
                 price_el.text = data["price"]
-
-        # Старая цена (oldprice)
+        # Oldprice
         if data["old_price"]:
             oldprice_el = offer.find("oldprice")
             if oldprice_el is not None:
@@ -97,18 +97,20 @@ for offer in offers:
             else:
                 oldprice_el = ET.SubElement(offer, "oldprice")
                 oldprice_el.text = data["old_price"]
-
-        # Наличие
+        # Available
         offer.set("available", data["available"])
-    else:
-        # Если совпадений нет — оставляем исходные price, oldprice, available
-        pass
+    # Если нет совпадений с Розеткой — оставляем как есть
 
 print(f"  ✅ Эпицентр обновлён: {len(offers)} товаров\n")
 
 # ================== СОХРАНЕНИЕ ==================
 tree.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
-print(f"▶ XML сохранён: {OUTPUT_XML}")
+print(f"▶ XML сохранён во временной папке: {OUTPUT_XML}")
+
+# Копируем файл сразу в корень репозитория для GitHub Actions
+REPO_ROOT = Path.cwd()
+shutil.copy2(OUTPUT_XML, REPO_ROOT / "update_epicenter.xml")
+print(f"▶ XML скопирован в репозиторий: {REPO_ROOT / 'update_epicenter.xml'}")
 
 # ================== ОЧИСТКА ==================
 ROZETKA_XML.unlink(missing_ok=True)
