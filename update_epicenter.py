@@ -41,11 +41,10 @@ download_file(EPICENTER_URL, EPICENTER_XML, "Эпицентр XML")
 # ================== ПАРСИНГ РОЗЕТКА ==================
 print("▶ Парсинг Розетка...")
 rozetka_data = {}
+tree_rozetka = ET.parse(ROZETKA_XML)
+root_rozetka = tree_rozetka.getroot()
 
-tree = ET.parse(ROZETKA_XML)
-root = tree.getroot()
-
-for offer in root.findall(".//offer"):
+for offer in root_rozetka.findall(".//offer"):
     rid = offer.get("id")
     if not rid:
         continue
@@ -57,7 +56,7 @@ for offer in root.findall(".//offer"):
 
 print(f"  ✅ Розетка: {len(rozetka_data)} товаров\n")
 
-# ================== ПАРСИНГ ЭПИЦЕНТР И ОБНОВЛЕНИЕ ==================
+# ================== ПАРСИНГ ЭПИЦЕНТР ==================
 print("▶ Парсинг Эпицентр и обновление...")
 tree = ET.parse(EPICENTER_XML)
 root = tree.getroot()
@@ -68,38 +67,35 @@ for offer in offers:
     if not vendor_code:
         continue
 
-    # Проверяем param name="Артикул"
+    # ===== Определяем id =====
     param_artikul = offer.find(".//param[@name='Артикул']")
-    if param_artikul is not None and param_artikul.text.strip() != vendor_code:
-        new_id = param_artikul.text.strip()
+    if param_artikul is not None:
+        artikul_value = param_artikul.text.strip()
+        if artikul_value and artikul_value != vendor_code:
+            offer.set("id", artikul_value)
+        else:
+            offer.set("id", vendor_code)
     else:
-        new_id = vendor_code
-
-    offer.set("id", new_id)
+        offer.set("id", vendor_code)
 
     # ===== Подставляем данные из Розетки =====
-    if vendor_code in rozetka_data:
-        rozetka_info = rozetka_data[vendor_code]
-
-        # available
-        offer.set("available", rozetka_info["available"])
-
-        # price — всегда из Розетки
-        price_el = offer.find("price")
-        if price_el is None:
-            price_el = ET.SubElement(offer, "price")
-        price_el.text = rozetka_info["price"]
-
-        # oldprice — только если есть
-        if rozetka_info["old_price"]:
-            oldprice_el = offer.find("oldprice")
-            if oldprice_el is None:
-                oldprice_el = ET.SubElement(offer, "oldprice")
-            oldprice_el.text = rozetka_info["old_price"]
-        else:
+    lookup_id = offer.get("id")
+    if lookup_id in rozetka_data:
+        data = rozetka_data[lookup_id]
+        if data["price"]:
+            price_el = offer.find("price")
+            if price_el is not None:
+                price_el.text = data["price"]
+        if data["old_price"]:
             oldprice_el = offer.find("oldprice")
             if oldprice_el is not None:
-                offer.remove(oldprice_el)
+                oldprice_el.text = data["old_price"]
+            else:
+                # Если тега oldprice нет, создаем его
+                oldprice_el = ET.SubElement(offer, "oldprice")
+                oldprice_el.text = data["old_price"]
+        # Наличие
+        offer.set("available", data["available"])
 
 print(f"  ✅ Эпицентр обновлён: {len(offers)} товаров\n")
 
