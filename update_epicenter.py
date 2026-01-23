@@ -82,8 +82,9 @@ for offer in offers:
     offer.set("id", offer_id)
 
     # ===== Подставляем данные из Розетки =====
-    if vendor_code in rozetka_data:
-        data = rozetka_data[vendor_code]
+    # Ищем по итоговому id
+    if offer_id in rozetka_data:
+        data = rozetka_data[offer_id]
         # Price
         if data["price"]:
             price_el = offer.find("price")
@@ -99,7 +100,7 @@ for offer in offers:
                 oldprice_el.text = data["old_price"]
         # Available
         offer.set("available", data["available"])
-    # Если нет совпадений с Розеткой — оставляем как есть
+    # Если совпадений нет — оставляем price, oldprice, available как есть
 
 print(f"  ✅ Эпицентр обновлён: {len(offers)} товаров\n")
 
