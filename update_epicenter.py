@@ -136,7 +136,8 @@ for offer in offers:
         if data["price"]:
             offer.find("price").text = data["price"]
         if data["old_price"]:
-            old = offer.find("oldprice") or ET.SubElement(offer, "oldprice")
+            old = offer.find("oldprice") or ET.SubElement(offer, "price_old")
+            old.tag = "price_old"  # заменяем тег
             old.text = data["old_price"]
         offer.set("available", data["available"])
 
