@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          pip install requests lxml
 
       # --- Запуск скрипта обновления Epicenter ---
       - name: Run update_epicenter.py
