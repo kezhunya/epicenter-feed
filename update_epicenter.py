@@ -4,6 +4,7 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import shutil
+from datetime import datetime
 
 # ================== НАСТРОЙКИ ==================
 ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
@@ -23,13 +24,7 @@ BANNED_VENDORS = {
 }
 
 BANNED_CATEGORY_ROOTS = {
-    "1276",  # Декоративные панели для вентиляторов
-    "1278",  # Обратные клапана, сифоны
-    "1157",  # Душевые кабины / Комплектующие
-    "1252",  # Средства герметизации
-    "1251",  # Трубы водопроводные
-    "1199",  # Фильтры / Комплектующие
-    "1161",  # Раковины / Комплектующие
+    "1276", "1278", "1157", "1252", "1251", "1199", "1161"
 }
 
 # ================== TELEGRAM ==================
@@ -106,16 +101,14 @@ def is_banned_category(cid: str) -> bool:
         cid = category_parent.get(cid)
     return False
 
-offers_root = root.find(".//offers")
-offers = offers_root.findall("offer")
+offers_root = ET.Element("offers")
 removed = 0
 
-for offer in offers:
+for offer in root.findall(".//offer"):
     vendor = offer.findtext("vendor", "").strip()
     category_id = offer.findtext("categoryId", "").strip()
 
     if vendor in BANNED_VENDORS or is_banned_category(category_id):
-        offers_root.remove(offer)
         removed += 1
         continue
 
@@ -140,12 +133,20 @@ for offer in offers:
             old.text = data["old_price"]
         offer.set("available", data["available"])
 
+    offers_root.append(offer)
+
 # ================== ПЕРЕИМЕНОВАНИЕ OLDPRICE ==================
-for oldprice_elem in root.findall(".//oldprice"):
+for oldprice_elem in offers_root.findall(".//oldprice"):
     oldprice_elem.tag = "price_old"
 
+# ================== СОЗДАНИЕ ФИНАЛЬНОГО КОРНЯ ==================
+yml_root = ET.Element("yml_catalog")
+yml_root.attrib["date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+yml_root.append(offers_root)
+
 # ================== СОХРАНЕНИЕ ==================
-tree.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
+tree_final = ET.ElementTree(yml_root)
+tree_final.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
 REPO_ROOT = Path.cwd()
 shutil.copy2(OUTPUT_XML, REPO_ROOT / "update_epicenter.xml")
 
