@@ -4,6 +4,7 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import shutil
+import copy
 
 # ================== НАСТРОЙКИ ==================
 ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
@@ -21,10 +22,7 @@ BANNED_VENDORS = {
     "Ariston", "Atlant", "Bosch", "Bradas", "Franke",
     "Mexen", "Neon", "NoName", "TeploCeramic", "Yoka", "Новая Вода"
 }
-
-BANNED_CATEGORY_ROOTS = {
-    "1276", "1278", "1157", "1252", "1251", "1199", "1161"
-}
+BANNED_CATEGORY_ROOTS = {"1276", "1278", "1157", "1252", "1251", "1199", "1161"}
 
 # ================== TELEGRAM ==================
 TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -85,13 +83,8 @@ for offer in tree_r.getroot().findall(".//offer"):
 tree = ET.parse(EPICENTER_XML)
 root = tree.getroot()
 
-# --- строим карту категорий ---
-category_parent = {}
-for cat in root.findall(".//category"):
-    cid = cat.get("id")
-    pid = cat.get("parentId")
-    if cid and pid:
-        category_parent[cid] = pid
+# --- карта категорий ---
+category_parent = {cat.get("id"): cat.get("parentId") for cat in root.findall(".//category")}
 
 def is_banned_category(cid: str) -> bool:
     while cid:
@@ -100,16 +93,13 @@ def is_banned_category(cid: str) -> bool:
         cid = category_parent.get(cid)
     return False
 
-# --- создаём новый корень yml_catalog и переносим <offers> ---
+# --- новый корень ---
 new_root = ET.Element("yml_catalog")
 new_root.set("date", root.attrib.get("date", ""))
 
-offers_elem = root.find(".//offers")
-if offers_elem is None:
-    raise ValueError("В исходном XML нет <offers>")
-new_root.append(offers_elem)
+new_offers_elem = ET.SubElement(new_root, "offers")
 
-offers_root = offers_elem
+offers_root = root.find(".//offers")
 offers = offers_root.findall("offer")
 removed = 0
 
@@ -118,42 +108,41 @@ for offer in offers:
     category_id = offer.findtext("categoryId", "").strip()
 
     if vendor in BANNED_VENDORS or is_banned_category(category_id):
-        offers_root.remove(offer)
         removed += 1
         continue
 
-    vendor_code = offer.findtext("vendorCode", "").strip()
-    if not vendor_code:
-        continue
-
-    param_artikul = offer.find(".//param[@name='Артикул']")
+    offer_copy = copy.deepcopy(offer)  # важно: делаем глубокую копию, чтобы сохранить дочерние элементы
+    vendor_code = offer_copy.findtext("vendorCode", "").strip()
+    param_artikul = offer_copy.find(".//param[@name='Артикул']")
     if param_artikul is not None and param_artikul.text:
         offer_id = param_artikul.text.strip()
-    else:
+    elif vendor_code:
         offer_id = vendor_code
+    else:
+        offer_id = offer_copy.get("id")
+    offer_copy.set("id", offer_id)
 
-    offer.set("id", offer_id)
-
+    # Обновляем цены и наличие
     if offer_id in rozetka_data:
         data = rozetka_data[offer_id]
         if data["price"]:
-            offer.find("price").text = data["price"]
+            offer_copy.find("price").text = data["price"]
         if data["old_price"]:
-            old = offer.find("oldprice") or ET.SubElement(offer, "oldprice")
+            old = offer_copy.find("oldprice") or ET.SubElement(offer_copy, "oldprice")
             old.text = data["old_price"]
-        offer.set("available", data["available"])
+        offer_copy.set("available", data["available"])
 
-    # --- Преобразуем name / description в формат с lang ---
-    name = offer.find("name")
-    name_ua = offer.find("name_ua")
+    # Преобразуем name / description
+    name = offer_copy.find("name")
+    name_ua = offer_copy.find("name_ua")
     if name is not None:
         name.tag = "name"
         name.set("lang", "ru")
     if name_ua is not None:
         name_ua.tag = "name"
         name_ua.set("lang", "ua")
-    description = offer.find("description")
-    description_ua = offer.find("description_ua")
+    description = offer_copy.find("description")
+    description_ua = offer_copy.find("description_ua")
     if description is not None:
         description.tag = "description"
         description.set("lang", "ru")
@@ -161,15 +150,16 @@ for offer in offers:
         description_ua.tag = "description"
         description_ua.set("lang", "ua")
 
-# --- Переименовываем oldprice в price_old ---
-for oldprice_elem in new_root.findall(".//oldprice"):
-    oldprice_elem.tag = "price_old"
+    # oldprice -> price_old
+    for oldprice_elem in offer_copy.findall(".//oldprice"):
+        oldprice_elem.tag = "price_old"
+
+    new_offers_elem.append(offer_copy)
 
 # ================== СОХРАНЕНИЕ ==================
 tree_new = ET.ElementTree(new_root)
 tree_new.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
-REPO_ROOT = Path.cwd()
-shutil.copy2(OUTPUT_XML, REPO_ROOT / "update_epicenter.xml")
+shutil.copy2(OUTPUT_XML, Path.cwd() / "update_epicenter.xml")
 
 # ================== ОТПРАВКА В TELEGRAM ==================
 message = f"""===== СТАРТ =====
@@ -181,7 +171,7 @@ message = f"""===== СТАРТ =====
   ✅ Эпицентр XML загружен
 
 ❌ Удалено из файла (левых) товаров: {removed}
-📦 Отправляем на Эпицентр товаров: {len(offers_root.findall('offer'))}
+📦 Отправляем на Эпицентр товаров: {len(new_offers_elem.findall('offer'))}
 ===== ГОТОВО ✅ ====="""
 
 send_telegram(message)
