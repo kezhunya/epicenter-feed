@@ -136,10 +136,13 @@ for offer in offers:
         if data["price"]:
             offer.find("price").text = data["price"]
         if data["old_price"]:
-            old = offer.find("oldprice") or ET.SubElement(offer, "price_old")
-            old.tag = "price_old"  # заменяем тег
+            old = offer.find("oldprice") or ET.SubElement(offer, "oldprice")
             old.text = data["old_price"]
         offer.set("available", data["available"])
+
+# ================== ПЕРЕИМЕНОВАНИЕ OLDPRICE ==================
+for oldprice_elem in root.findall(".//oldprice"):
+    oldprice_elem.tag = "price_old"
 
 # ================== СОХРАНЕНИЕ ==================
 tree.write(OUTPUT_XML, encoding="UTF-8", xml_declaration=True)
