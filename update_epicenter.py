@@ -18,8 +18,49 @@ EPICENTER_XML = TMP_DIR / "epicenter.xml"
 OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
 
 # ===== ЧЁРНЫЕ СПИСКИ =====
-BANNED_VENDORS = {"Ariston","Atlant","Bosch","Bradas","Franke","Mexen","Neon","NoName","TeploCeramic","Yoka","Новая Вода"}
+BANNED_VENDORS = {
+    "Ariston","Atlant","Bosch","Bradas","Franke",
+    "Mexen","Neon","NoName","TeploCeramic","Yoka","Новая Вода"
+}
+
 BANNED_CATEGORY_ROOTS = {"1276","1278","1157","1252","1251","1199","1161"}
+
+# ===== КАТЕГОРИИ ЭПИЦЕНТРА =====
+EPICENTER_CATEGORY_MAP = {
+    "962": "Ванни",
+    "963": "Ванни гідромасажні",
+    "966": "Шторки для ванн",
+    "6905": "Монтажні елементи та аксесуари для ванн",
+    "967": "Ніжки для ванн",
+    "965": "Панелі для ванн",
+    "993": "Змішувачі",
+    "974": "Унітази та компакти",
+    "983": "Інсталяції",
+    "977": "Біде",
+    "978": "Пісуари",
+    "980": "Бачки для унітаза",
+    "981": "Сидіння та кришки для унітаза",
+    "1654": "Сифони",
+    "6922": "Душові системи",
+    "6917": "Душові набори",
+    "9376": "Верхні та бокові душі",
+    "6920": "Лійки для душу",
+    "6916": "Шланги для душу",
+    "969": "Душові кабіни",
+    "970": "Гідромасажні бокси",
+    "971": "Душові піддони",
+    "972": "Душові двері та стінки",
+    "988": "Дзеркала для ванної кімнати",
+    "989": "Шафи та пенали для ванної кімнати",
+    "987": "Тумби для ванної кімнати",
+    "4600": "Мийки для кухні",
+    "1005": "Рушникосушарки електричні",
+    "1004": "Рушникосушарки водяні",
+    "1619": "Бойлери",
+    "1604": "Котли газові",
+    "1605": "Котли електричні",
+    "1606": "Котли твердопаливні",
+}
 
 # ================== TELEGRAM ==================
 TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -27,7 +68,7 @@ TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 def send_telegram(message: str):
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
-        print("⚠ TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID не задан. Сообщение не отправлено.")
+        print("⚠ TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID не задан.")
         return
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": TG_CHAT_ID,"text": message,"parse_mode": "HTML"}
@@ -89,27 +130,36 @@ new_root = ET.Element("yml_catalog", date=root.get("date",""))
 new_offers = ET.SubElement(new_root, "offers")
 
 removed = 0
+
 for offer in root.xpath("//offer"):
+
     vendor = offer.findtext("vendor","").strip()
     category_id = offer.findtext("categoryId","").strip()
-    if vendor in BANNED_VENDORS or is_banned_category(category_id):
-        removed +=1
+
+    if (
+        vendor in BANNED_VENDORS
+        or is_banned_category(category_id)
+        or category_id not in EPICENTER_CATEGORY_MAP
+    ):
+        removed += 1
         continue
 
     offer_copy = copy.deepcopy(offer)
 
-    # артикул и id
+    # ===== ID =====
     vendor_code = offer_copy.findtext("vendorCode","").strip()
     param_artikul = offer_copy.find(".//param[@name='Артикул']")
+
     if param_artikul is not None and param_artikul.text:
         offer_id = param_artikul.text.strip()
     elif vendor_code:
         offer_id = vendor_code
     else:
         offer_id = offer_copy.get("id")
+
     offer_copy.set("id", offer_id)
 
-    # обновляем цены и наличие
+    # ===== ОБНОВЛЕНИЕ ЦЕН =====
     if offer_id in rozetka_data:
         data = rozetka_data[offer_id]
         if data["price"]:
@@ -119,7 +169,7 @@ for offer in root.xpath("//offer"):
             old.text = data["old_price"]
         offer_copy.set("available", data["available"])
 
-    # name / description
+    # ===== NAME / DESCRIPTION =====
     name = offer_copy.find("name")
     name_ua = offer_copy.find("name_ua")
     if name is not None:
@@ -128,6 +178,7 @@ for offer in root.xpath("//offer"):
     if name_ua is not None:
         name_ua.tag = "name"
         name_ua.set("lang","ua")
+
     description = offer_copy.find("description")
     description_ua = offer_copy.find("description_ua")
     if description is not None:
@@ -137,9 +188,22 @@ for offer in root.xpath("//offer"):
         description_ua.tag = "description"
         description_ua.set("lang","ua")
 
-    # oldprice -> price_old
+    # ===== oldprice → price_old =====
     for oldprice_elem in offer_copy.xpath(".//oldprice"):
         oldprice_elem.tag = "price_old"
+
+    # ===== CATEGORY + ATTRIBUTE_SET =====
+    category_name = EPICENTER_CATEGORY_MAP.get(category_id)
+
+    cat_el = ET.Element("category")
+    cat_el.set("code", category_id)
+    cat_el.text = category_name
+    offer_copy.append(cat_el)
+
+    attr_el = ET.Element("attribute_set")
+    attr_el.set("code", category_id)
+    attr_el.text = category_name
+    offer_copy.append(attr_el)
 
     new_offers.append(offer_copy)
 
@@ -149,17 +213,11 @@ tree_new.write(str(OUTPUT_XML), encoding="UTF-8", xml_declaration=True, pretty_p
 shutil.copy2(OUTPUT_XML, Path.cwd() / "update_epicenter.xml")
 
 # ================== TELEGRAM ==================
-message = f"""===== СТАРТ =====
+message = f"""===== ГОТОВО ✅ =====
 
-▶ Загрузка: Розетка XML
-  ✅ Розетка XML загружен
-
-▶ Загрузка: Эпицентр XML
-  ✅ Эпицентр XML загружен
-
-❌ Удалено из файла (левых) товаров: {removed}
-📦 Отправляем на Эпицентр товаров: {len(new_offers.xpath('offer'))}
-===== ГОТОВО ✅ ====="""
+❌ Удалено товаров: {removed}
+📦 Отправляем товаров: {len(new_offers.xpath('offer'))}
+"""
 
 send_telegram(message)
 print(message)
