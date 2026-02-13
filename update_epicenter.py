@@ -347,10 +347,11 @@ for offer in root.xpath("//offer"):
     offer_copy.insert(insert_pos, category_node)
     offer_copy.insert(insert_pos + 1, attribute_set_node)
 
-    # убрать name у всех param по требованию "без param name"
+    # убрать все param по требованию: не передавать параметры товаров
     for param in offer_copy.xpath(".//param"):
-        if "name" in param.attrib:
-            del param.attrib["name"]
+        parent = param.getparent()
+        if parent is not None:
+            parent.remove(param)
 
     new_offers.append(offer_copy)
 
