@@ -25,41 +25,20 @@ BANNED_VENDORS = {
 
 BANNED_CATEGORY_ROOTS = {"1276","1278","1157","1252","1251","1199","1161"}
 
-# ===== КАТЕГОРИИ ЭПИЦЕНТРА =====
+# ===== КАТЕГОРИИ ЭПИЦЕНТРА (по корневым ID) =====
 EPICENTER_CATEGORY_MAP = {
     "962": "Ванни",
     "963": "Ванни гідромасажні",
     "966": "Шторки для ванн",
-    "6905": "Монтажні елементи та аксесуари для ванн",
-    "967": "Ніжки для ванн",
-    "965": "Панелі для ванн",
     "993": "Змішувачі",
     "974": "Унітази та компакти",
     "983": "Інсталяції",
-    "977": "Біде",
-    "978": "Пісуари",
-    "980": "Бачки для унітаза",
-    "981": "Сидіння та кришки для унітаза",
     "1654": "Сифони",
     "6922": "Душові системи",
-    "6917": "Душові набори",
-    "9376": "Верхні та бокові душі",
-    "6920": "Лійки для душу",
-    "6916": "Шланги для душу",
     "969": "Душові кабіни",
-    "970": "Гідромасажні бокси",
-    "971": "Душові піддони",
-    "972": "Душові двері та стінки",
     "988": "Дзеркала для ванної кімнати",
-    "989": "Шафи та пенали для ванної кімнати",
-    "987": "Тумби для ванної кімнати",
     "4600": "Мийки для кухні",
-    "1005": "Рушникосушарки електричні",
-    "1004": "Рушникосушарки водяні",
     "1619": "Бойлери",
-    "1604": "Котли газові",
-    "1605": "Котли електричні",
-    "1606": "Котли твердопаливні",
 }
 
 # ================== TELEGRAM ==================
@@ -68,38 +47,24 @@ TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 def send_telegram(message: str):
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
-        print("⚠ TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID не задан.")
         return
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TG_CHAT_ID,"text": message,"parse_mode": "HTML"}
+    payload = {"chat_id": TG_CHAT_ID,"text": message}
     try:
-        r = requests.post(url, data=payload, timeout=10)
-        r.raise_for_status()
-    except Exception as e:
-        print(f"⚠ Ошибка отправки в Telegram: {e}")
+        requests.post(url, data=payload, timeout=10)
+    except:
+        pass
 
 # ================== СКАЧИВАНИЕ ==================
-def download_file(url, path, title, retries=5, timeout=180):
-    print(f"▶ Загрузка: {title}")
-    for attempt in range(1, retries+1):
-        try:
-            r = requests.get(url, stream=True, timeout=timeout)
-            r.raise_for_status()
-            with open(path, "wb") as f:
-                for chunk in r.iter_content(1024*1024):
-                    if chunk:
-                        f.write(chunk)
-            print(f"  ✅ {title} загружен\n")
-            return
-        except Exception as e:
-            print(f"  ⚠ Ошибка: {e}")
-            if attempt == retries:
-                raise
-            time.sleep(5)
+def download_file(url, path):
+    r = requests.get(url, timeout=180)
+    r.raise_for_status()
+    with open(path, "wb") as f:
+        f.write(r.content)
 
 print("\n===== СТАРТ =====\n")
-download_file(ROZETKA_URL, ROZETKA_XML, "Розетка XML")
-download_file(EPICENTER_URL, EPICENTER_XML, "Эпицентр XML")
+download_file(ROZETKA_URL, ROZETKA_XML)
+download_file(EPICENTER_URL, EPICENTER_XML)
 
 # ================== РОЗЕТКА ==================
 rozetka_data = {}
@@ -117,7 +82,16 @@ for offer in tree_r.xpath("//offer"):
 tree = ET.parse(str(EPICENTER_XML))
 root = tree.getroot()
 
+# строим дерево категорий
 category_parent = {c.get("id"): c.get("parentId") for c in root.xpath("//category")}
+
+def find_root_category(cid):
+    """Поднимаемся вверх по дереву категорий"""
+    while cid:
+        if cid in EPICENTER_CATEGORY_MAP:
+            return cid
+        cid = category_parent.get(cid)
+    return None
 
 def is_banned_category(cid):
     while cid:
@@ -130,17 +104,20 @@ new_root = ET.Element("yml_catalog", date=root.get("date",""))
 new_offers = ET.SubElement(new_root, "offers")
 
 removed = 0
+exported = 0
 
 for offer in root.xpath("//offer"):
 
     vendor = offer.findtext("vendor","").strip()
     category_id = offer.findtext("categoryId","").strip()
 
-    if (
-        vendor in BANNED_VENDORS
-        or is_banned_category(category_id)
-        or category_id not in EPICENTER_CATEGORY_MAP
-    ):
+    if vendor in BANNED_VENDORS or is_banned_category(category_id):
+        removed += 1
+        continue
+
+    mapped_category = find_root_category(category_id)
+
+    if not mapped_category:
         removed += 1
         continue
 
@@ -170,42 +147,37 @@ for offer in root.xpath("//offer"):
         offer_copy.set("available", data["available"])
 
     # ===== NAME / DESCRIPTION =====
-    name = offer_copy.find("name")
-    name_ua = offer_copy.find("name_ua")
-    if name is not None:
-        name.tag = "name"
-        name.set("lang","ru")
-    if name_ua is not None:
-        name_ua.tag = "name"
-        name_ua.set("lang","ua")
+    for tag, lang in [("name","ru"), ("name_ua","ua")]:
+        elem = offer_copy.find(tag)
+        if elem is not None:
+            elem.tag = "name"
+            elem.set("lang", lang)
 
-    description = offer_copy.find("description")
-    description_ua = offer_copy.find("description_ua")
-    if description is not None:
-        description.tag = "description"
-        description.set("lang","ru")
-    if description_ua is not None:
-        description_ua.tag = "description"
-        description_ua.set("lang","ua")
+    for tag, lang in [("description","ru"), ("description_ua","ua")]:
+        elem = offer_copy.find(tag)
+        if elem is not None:
+            elem.tag = "description"
+            elem.set("lang", lang)
 
     # ===== oldprice → price_old =====
     for oldprice_elem in offer_copy.xpath(".//oldprice"):
         oldprice_elem.tag = "price_old"
 
     # ===== CATEGORY + ATTRIBUTE_SET =====
-    category_name = EPICENTER_CATEGORY_MAP.get(category_id)
+    category_name = EPICENTER_CATEGORY_MAP[mapped_category]
 
     cat_el = ET.Element("category")
-    cat_el.set("code", category_id)
+    cat_el.set("code", mapped_category)
     cat_el.text = category_name
     offer_copy.append(cat_el)
 
     attr_el = ET.Element("attribute_set")
-    attr_el.set("code", category_id)
+    attr_el.set("code", mapped_category)
     attr_el.text = category_name
     offer_copy.append(attr_el)
 
     new_offers.append(offer_copy)
+    exported += 1
 
 # ================== СОХРАНЕНИЕ ==================
 tree_new = ET.ElementTree(new_root)
@@ -214,10 +186,8 @@ shutil.copy2(OUTPUT_XML, Path.cwd() / "update_epicenter.xml")
 
 # ================== TELEGRAM ==================
 message = f"""===== ГОТОВО ✅ =====
-
 ❌ Удалено товаров: {removed}
-📦 Отправляем товаров: {len(new_offers.xpath('offer'))}
+📦 Отправляем товаров: {exported}
 """
-
 send_telegram(message)
 print(message)
