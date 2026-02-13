@@ -1,10 +1,11 @@
+import copy
 import os
-import requests
+import shutil
 import time
 from pathlib import Path
-import shutil
+
+import requests
 from lxml import etree as ET
-import copy
 
 # ================== НАСТРОЙКИ ==================
 ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
@@ -12,172 +13,346 @@ EPICENTER_URL = "https://aqua-favorit.com.ua/content/export/e8965786f1dc7b09ba99
 
 TMP_DIR = Path("/tmp/epicenter_feed")
 TMP_DIR.mkdir(parents=True, exist_ok=True)
-
 ROZETKA_XML = TMP_DIR / "rozetka.xml"
 EPICENTER_XML = TMP_DIR / "epicenter.xml"
 OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
 
 # ===== ЧЁРНЫЕ СПИСКИ =====
 BANNED_VENDORS = {
-    "Ariston","Atlant","Bosch","Bradas","Franke",
-    "Mexen","Neon","NoName","TeploCeramic","Yoka","Новая Вода"
+    "Ariston",
+    "Atlant",
+    "Bosch",
+    "Bradas",
+    "Franke",
+    "Mexen",
+    "Neon",
+    "NoName",
+    "TeploCeramic",
+    "Yoka",
+    "Новая Вода",
 }
 
-BANNED_CATEGORY_ROOTS = {"1276","1278","1157","1252","1251","1199","1161"}
+BANNED_CATEGORY_ROOTS = {"1276", "1278", "1157", "1252", "1251", "1199", "1161"}
 
-# ===== КАТЕГОРИИ ЭПИЦЕНТРА (по корневым ID) =====
-EPICENTER_CATEGORY_MAP = {
-    "962": "Ванни",
-    "963": "Ванни гідромасажні",
-    "966": "Шторки для ванн",
-    "993": "Змішувачі",
-    "974": "Унітази та компакти",
-    "983": "Інсталяції",
-    "1654": "Сифони",
-    "6922": "Душові системи",
-    "969": "Душові кабіни",
-    "988": "Дзеркала для ванної кімнати",
-    "4600": "Мийки для кухні",
-    "1619": "Бойлери",
+# source categoryId -> (Epicenter code, Epicenter leaf category title)
+CATEGORY_MAPPING = {
+    "1009": ("962", "Ванни"),
+    "1059": ("962", "Ванни"),
+    "1060": ("962", "Ванни"),
+    "1061": ("962", "Ванни"),
+    "1062": ("962", "Ванни"),
+    "1064": ("963", "Ванни гідромасажні"),
+    "1065": ("963", "Ванни гідромасажні"),
+    "1066": ("966", "Шторки для ванн"),
+    "1200": ("966", "Шторки для ванн"),
+    "1067": ("6905", "Монтажні елементи та аксесуари для ванн"),
+    "1149": ("6905", "Монтажні елементи та аксесуари для ванн"),
+    "1179": ("967", "Ніжки для ванн"),
+    "1180": ("967", "Ніжки для ванн"),
+    "1178": ("6905", "Монтажні елементи та аксесуари для ванн"),
+    "1181": ("6905", "Монтажні елементи та аксесуари для ванн"),
+    "1177": ("6905", "Монтажні елементи та аксесуари для ванн"),
+    "1150": ("965", "Панелі для ванн"),
+    "1007": ("993", "Змішувачі"),
+    "1068": ("993", "Змішувачі"),
+    "1069": ("993", "Змішувачі"),
+    "1070": ("993", "Змішувачі"),
+    "1072": ("993", "Змішувачі"),
+    "1073": ("993", "Змішувачі"),
+    "1071": ("993", "Змішувачі"),
+    "1075": ("6924", "Гігієнічний душ"),
+    "1211": ("993", "Змішувачі"),
+    "1214": ("993", "Змішувачі"),
+    "1076": ("993", "Змішувачі"),
+    "1170": ("6914", "Аксесуари та комплектуючі для змішувачів"),
+    "1217": ("993", "Змішувачі"),
+    "1218": ("993", "Змішувачі"),
+    "1242": ("1648", "Запірна арматура"),
+    "1080": ("974", "Унітази та компакти"),
+    "1081": ("983", "Інсталяції"),
+    "1082": ("974", "Унітази та компакти"),
+    "1083": ("974", "Унітази та компакти"),
+    "1084": ("974", "Унітази та компакти"),
+    "1174": ("974", "Унітази та компакти"),
+    "1085": ("977", "Біде"),
+    "1201": ("983", "Інсталяції"),
+    "1086": ("978", "Пісуари"),
+    "1087": ("980", "Бачки для унітаза"),
+    "1088": ("981", "Сидіння та кришки для унітаза"),
+    "1089": ("981", "Сидіння та кришки для унітаза"),
+    "1090": ("1654", "Сифони"),
+    "1175": ("979", "Чаші Генуя"),
+    "1094": ("976", "П'єдестали для раковин"),
+    "1095": ("976", "П'єдестали для раковин"),
+    "1096": ("976", "П'єдестали для раковин"),
+    "1097": ("1654", "Сифони"),
+    "1098": ("1654", "Сифони"),
+    "1101": ("6922", "Душові системи"),
+    "1102": ("6922", "Душові системи"),
+    "1100": ("6917", "Душові набори"),
+    "1099": ("9376", "Верхні та бокові душі"),
+    "1109": ("9420", "Кронштейни для душу"),
+    "1103": ("6920", "Лійки для душу"),
+    "1104": ("6921", "Штанги, тримачі та підключення для душу"),
+    "1105": ("6916", "Шланги для душу"),
+    "1106": ("6921", "Штанги, тримачі та підключення для душу"),
+    "1107": ("6921", "Штанги, тримачі та підключення для душу"),
+    "1108": ("9376", "Верхні та бокові душі"),
+    "1156": ("6914", "Аксесуари та комплектуючі для змішувачів"),
+    "1110": ("969", "Душові кабіни"),
+    "1114": ("970", "Гідромасажні бокси"),
+    "1111": ("971", "Душові піддони"),
+    "1116": ("6636", "Трапи"),
+    "1117": ("6636", "Трапи"),
+    "1112": ("972", "Душові двері та стінки"),
+    "1113": ("972", "Душові двері та стінки"),
+    "1118": ("1654", "Сифони"),
+    "1157": ("6908", "Комплектуючі та аксесуари для душових кабін та боксів"),
+    "1121": ("983", "Інсталяції"),
+    "1127": ("983", "Інсталяції"),
+    "1122": ("983", "Інсталяції"),
+    "1123": ("983", "Інсталяції"),
+    "1124": ("983", "Інсталяції"),
+    "1125": ("983", "Інсталяції"),
+    "1126": ("984", "Клавіші змиву та комплектуючі"),
+    "1128": ("984", "Клавіші змиву та комплектуючі"),
+    "1129": ("988", "Дзеркала для ванної кімнати"),
+    "1133": ("988", "Дзеркала для ванної кімнати"),
+    "1130": ("989", "Шафи та пенали для ванної кімнати"),
+    "1132": ("987", "Тумби для ванної кімнати"),
+    "1131": ("987", "Тумби для ванної кімнати"),
+    "1232": ("987", "Тумби для ванної кімнати"),
+    "1176": ("3561", "Стільниці і комплектуючі для ванної кімнати"),
+    "1202": ("987", "Тумби для ванної кімнати"),
+    "1134": ("3561", "Стільниці і комплектуючі для ванної кімнати"),
+    "1166": ("4600", "Мийки для кухні"),
+    "1224": ("993", "Змішувачі"),
+    "1169": ("1654", "Сифони"),
+    "1140": ("6508", "Набори аксесуарів"),
+    "1142": ("6626", "Гачки та планки для ванної кімнати"),
+    "1265": ("6594", "Тримачі для ванної кімнати"),
+    "1136": ("6624", "Тримачі для рушників"),
+    "1137": ("6620", "Тримачі для туалетного паперу"),
+    "1143": ("6873", "Мильниці"),
+    "1138": ("6619", "Дозатори для рідкого мила"),
+    "1145": ("6543", "Тримачі для зубних щіток"),
+    "1144": ("991", "Полиці для ванної кімнати"),
+    "1139": ("6629", "Йоржики для унітаза"),
+    "1189": ("1002", "Стійки для ванної кімнати"),
+    "1135": ("999", "Відра та кошики для ванної кімнати"),
+    "1171": ("6854", "Поручні для ванни"),
+    "1141": ("6502", "Косметичні дзеркала"),
+    "1190": ("999", "Відра та кошики для ванної кімнати"),
+    "1205": ("6544", "Сушарки для рук"),
+    "1206": ("2788", "Фени"),
+    "1264": ("6619", "Дозатори для рідкого мила"),
+    "1219": ("6619", "Дозатори для рідкого мила"),
+    "1173": ("6908", "Комплектуючі та аксесуари для душових кабін та боксів"),
+    "1212": ("999", "Відра та кошики для ванної кімнати"),
+    "1191": ("1001", "Килимки для ванної кімнати"),
+    "1120": ("1005", "Рушникосушарки електричні"),
+    "1119": ("1004", "Рушникосушарки водяні"),
+    "1215": ("6919", "Радіатори дизайнерські"),
+    "1262": ("1615", "Терморегулююча арматура"),
+    "1213": ("1005", "Рушникосушарки електричні"),
+    "1167": ("5461", "Комплектуючі для рушникосушарок"),
+    "1158": ("3541", "Побутові витяжні вентилятори"),
+    "1159": ("3539", "Повітропроводи та монтажні елементи"),
+    "1276": ("3540", "Вентиляційні решітки"),
+    "1277": ("4949", "Автоматика"),
+    "1278": ("3539", "Повітропроводи та монтажні елементи"),
+    "1275": ("3544", "Рекуператори"),
+    "1228": ("4985", "Теплові панелі"),
+    "1227": ("4985", "Теплові панелі"),
+    "1226": ("4985", "Теплові панелі"),
+    "1266": ("4912", "Інфрачервоні обігрівачі"),
+    "1271": ("1625", "Тепла підлога електрична"),
+    "1272": ("1625", "Тепла підлога електрична"),
+    "1160": ("1619", "Бойлери"),
+    "1233": ("1620", "Газові колонки"),
+    "1231": ("1604", "Котли газові"),
+    "1234": ("1605", "Котли електричні"),
+    "1259": ("1606", "Котли твердопаливні"),
+    "1235": ("1609", "Комплектуючі для котлів та допоміжне обладнання"),
+    "1223": ("1666", "Водопровідні насоси"),
+    "1249": ("1648", "Запірна арматура"),
+    "1250": ("1648", "Запірна арматура"),
+    "1253": ("1647", "Шланги для підключення"),
+    "1255": ("7985", "Колектори водопровідні"),
+    "1251": ("6607", "Металопластикові труби"),
+    "1257": ("5349", "Внутрішня каналізація"),
+    "1254": ("6906", "Фітинги різьбові"),
+    "1256": ("5349", "Внутрішня каналізація"),
+    "1245": ("1640", "Лічильники води"),
+    "1273": ("1609", "Комплектуючі для котлів та допоміжне обладнання"),
+    "1274": ("1609", "Комплектуючі для котлів та допоміжне обладнання"),
 }
 
 # ================== TELEGRAM ==================
 TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-def send_telegram(message: str):
+
+def send_telegram(message: str) -> None:
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        print("⚠ TELEGRAM_BOT_TOKEN или TELEGRAM_CHAT_ID не задан. Сообщение не отправлено.")
         return
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TG_CHAT_ID,"text": message}
+    payload = {"chat_id": TG_CHAT_ID, "text": message, "parse_mode": "HTML"}
     try:
-        requests.post(url, data=payload, timeout=10)
-    except:
-        pass
+        response = requests.post(url, data=payload, timeout=10)
+        response.raise_for_status()
+    except Exception as exc:
+        print(f"⚠ Ошибка отправки в Telegram: {exc}")
+
 
 # ================== СКАЧИВАНИЕ ==================
-def download_file(url, path):
-    r = requests.get(url, timeout=180)
-    r.raise_for_status()
-    with open(path, "wb") as f:
-        f.write(r.content)
+def download_file(url: str, path: Path, title: str, retries: int = 5, timeout: int = 180) -> None:
+    print(f"▶ Загрузка: {title}")
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.get(url, stream=True, timeout=timeout)
+            response.raise_for_status()
+            with open(path, "wb") as file_obj:
+                for chunk in response.iter_content(1024 * 1024):
+                    if chunk:
+                        file_obj.write(chunk)
+            print(f" ✅ {title} загружен\n")
+            return
+        except Exception as exc:
+            print(f" ⚠ Ошибка: {exc}")
+            if attempt == retries:
+                raise
+            time.sleep(5)
+
 
 print("\n===== СТАРТ =====\n")
-download_file(ROZETKA_URL, ROZETKA_XML)
-download_file(EPICENTER_URL, EPICENTER_XML)
+download_file(ROZETKA_URL, ROZETKA_XML, "Розетка XML")
+download_file(EPICENTER_URL, EPICENTER_XML, "Эпицентр XML")
 
 # ================== РОЗЕТКА ==================
 rozetka_data = {}
 tree_r = ET.parse(str(ROZETKA_XML))
 for offer in tree_r.xpath("//offer"):
-    rid = offer.get("id")
+    rid = (offer.get("id") or "").strip()
     if rid:
-        rozetka_data[rid.strip()] = {
-            "price": offer.findtext("price","").strip(),
-            "old_price": offer.findtext("oldprice","").strip(),
-            "available": offer.get("available","").strip()
+        rozetka_data[rid] = {
+            "price": offer.findtext("price", "").strip(),
+            "old_price": offer.findtext("oldprice", "").strip(),
+            "available": offer.get("available", "").strip(),
         }
 
 # ================== ЭПИЦЕНТР ==================
 tree = ET.parse(str(EPICENTER_XML))
 root = tree.getroot()
+category_parent = {cat.get("id"): cat.get("parentId") for cat in root.xpath("//category")}
 
-# строим дерево категорий
-category_parent = {c.get("id"): c.get("parentId") for c in root.xpath("//category")}
 
-def find_root_category(cid):
-    """Поднимаемся вверх по дереву категорий"""
-    while cid:
-        if cid in EPICENTER_CATEGORY_MAP:
-            return cid
-        cid = category_parent.get(cid)
-    return None
-
-def is_banned_category(cid):
-    while cid:
-        if cid in BANNED_CATEGORY_ROOTS:
+def is_banned_category(category_id: str) -> bool:
+    while category_id:
+        if category_id in BANNED_CATEGORY_ROOTS:
             return True
-        cid = category_parent.get(cid)
+        category_id = category_parent.get(category_id)
     return False
 
-new_root = ET.Element("yml_catalog", date=root.get("date",""))
+
+new_root = ET.Element("yml_catalog", date=root.get("date", ""))
 new_offers = ET.SubElement(new_root, "offers")
 
 removed = 0
-exported = 0
+mapped = 0
+unmapped = 0
 
 for offer in root.xpath("//offer"):
+    vendor = offer.findtext("vendor", "").strip()
+    src_category_id = offer.findtext("categoryId", "").strip()
 
-    vendor = offer.findtext("vendor","").strip()
-    category_id = offer.findtext("categoryId","").strip()
-
-    if vendor in BANNED_VENDORS or is_banned_category(category_id):
-        removed += 1
-        continue
-
-    mapped_category = find_root_category(category_id)
-
-    if not mapped_category:
+    if vendor in BANNED_VENDORS or is_banned_category(src_category_id):
         removed += 1
         continue
 
     offer_copy = copy.deepcopy(offer)
 
-    # ===== ID =====
-    vendor_code = offer_copy.findtext("vendorCode","").strip()
+    # артикул -> id
+    vendor_code = offer_copy.findtext("vendorCode", "").strip()
     param_artikul = offer_copy.find(".//param[@name='Артикул']")
 
-    if param_artikul is not None and param_artikul.text:
+    if param_artikul is not None and (param_artikul.text or "").strip():
         offer_id = param_artikul.text.strip()
     elif vendor_code:
         offer_id = vendor_code
     else:
-        offer_id = offer_copy.get("id")
+        offer_id = (offer_copy.get("id") or "").strip()
 
-    offer_copy.set("id", offer_id)
+    if offer_id:
+        offer_copy.set("id", offer_id)
 
-    # ===== ОБНОВЛЕНИЕ ЦЕН =====
+    # обновляем цены и наличие из розетки
     if offer_id in rozetka_data:
         data = rozetka_data[offer_id]
-        if data["price"]:
-            offer_copy.find("price").text = data["price"]
+        price_node = offer_copy.find("price")
+        if data["price"] and price_node is not None:
+            price_node.text = data["price"]
         if data["old_price"]:
-            old = offer_copy.find("oldprice") or ET.SubElement(offer_copy, "oldprice")
+            old = offer_copy.find("oldprice")
+            if old is None:
+                old = ET.SubElement(offer_copy, "oldprice")
             old.text = data["old_price"]
-        offer_copy.set("available", data["available"])
+        if data["available"]:
+            offer_copy.set("available", data["available"])
 
-    # ===== NAME / DESCRIPTION =====
-    for tag, lang in [("name","ru"), ("name_ua","ua")]:
-        elem = offer_copy.find(tag)
-        if elem is not None:
-            elem.tag = "name"
-            elem.set("lang", lang)
+    # name / description -> lang tags
+    name = offer_copy.find("name")
+    name_ua = offer_copy.find("name_ua")
+    if name is not None:
+        name.tag = "name"
+        name.set("lang", "ru")
+    if name_ua is not None:
+        name_ua.tag = "name"
+        name_ua.set("lang", "ua")
 
-    for tag, lang in [("description","ru"), ("description_ua","ua")]:
-        elem = offer_copy.find(tag)
-        if elem is not None:
-            elem.tag = "description"
-            elem.set("lang", lang)
+    description = offer_copy.find("description")
+    description_ua = offer_copy.find("description_ua")
+    if description is not None:
+        description.tag = "description"
+        description.set("lang", "ru")
+    if description_ua is not None:
+        description_ua.tag = "description"
+        description_ua.set("lang", "ua")
 
-    # ===== oldprice → price_old =====
+    # oldprice -> price_old
     for oldprice_elem in offer_copy.xpath(".//oldprice"):
         oldprice_elem.tag = "price_old"
 
-    # ===== CATEGORY + ATTRIBUTE_SET =====
-    category_name = EPICENTER_CATEGORY_MAP[mapped_category]
+    # categoryId -> category + attribute_set (Epicenter format)
+    mapped_category = CATEGORY_MAPPING.get(src_category_id)
+    category_id_node = offer_copy.find("categoryId")
+    if category_id_node is not None:
+        offer_copy.remove(category_id_node)
 
-    cat_el = ET.Element("category")
-    cat_el.set("code", mapped_category)
-    cat_el.text = category_name
-    offer_copy.append(cat_el)
+    if mapped_category:
+        mapped += 1
+        ep_code, ep_name = mapped_category
+    else:
+        unmapped += 1
+        ep_code = src_category_id or "0"
+        ep_name = "Без категорії"
 
-    attr_el = ET.Element("attribute_set")
-    attr_el.set("code", mapped_category)
-    attr_el.text = category_name
-    offer_copy.append(attr_el)
+    category_node = ET.Element("category", code=ep_code)
+    category_node.text = ep_name
+    attribute_set_node = ET.Element("attribute_set", code=ep_code)
+    attribute_set_node.text = ep_name
+
+    insert_pos = 2 if len(offer_copy) >= 2 else len(offer_copy)
+    offer_copy.insert(insert_pos, category_node)
+    offer_copy.insert(insert_pos + 1, attribute_set_node)
+
+    # убрать name у всех param по требованию "без param name"
+    for param in offer_copy.xpath(".//param"):
+        if "name" in param.attrib:
+            del param.attrib["name"]
 
     new_offers.append(offer_copy)
-    exported += 1
 
 # ================== СОХРАНЕНИЕ ==================
 tree_new = ET.ElementTree(new_root)
@@ -185,9 +360,16 @@ tree_new.write(str(OUTPUT_XML), encoding="UTF-8", xml_declaration=True, pretty_p
 shutil.copy2(OUTPUT_XML, Path.cwd() / "update_epicenter.xml")
 
 # ================== TELEGRAM ==================
-message = f"""===== ГОТОВО ✅ =====
-❌ Удалено товаров: {removed}
-📦 Отправляем товаров: {exported}
-"""
+message = f"""===== СТАРТ =====
+▶ Загрузка: Розетка XML
+✅ Розетка XML загружен
+▶ Загрузка: Эпицентр XML
+✅ Эпицентр XML загружен
+❌ Удалено из файла (левых) товаров: {removed}
+🗂 Сопоставлено категорий: {mapped}
+⚠ Не найдено категорий в таблице: {unmapped}
+📦 Отправляем на Эпицентр товаров: {len(new_offers.xpath('offer'))}
+===== ГОТОВО ✅ ====="""
+
 send_telegram(message)
 print(message)
