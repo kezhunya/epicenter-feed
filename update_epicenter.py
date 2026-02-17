@@ -272,6 +272,7 @@ for offer in root.xpath("//offer"):
         continue
 
     offer_copy = copy.deepcopy(offer)
+    offer_copy.attrib.pop("group_id", None)
 
     # артикул -> id
     vendor_code = offer_copy.findtext("vendorCode", "").strip()
