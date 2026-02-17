@@ -2,6 +2,7 @@ import copy
 import os
 import shutil
 import time
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -256,7 +257,7 @@ def is_banned_category(category_id: str) -> bool:
     return False
 
 
-new_root = ET.Element("yml_catalog", date=root.get("date", ""))
+new_root = ET.Element("yml_catalog", date=datetime.now().strftime("%Y-%m-%d %H:%M"))
 new_offers = ET.SubElement(new_root, "offers")
 
 removed = 0
