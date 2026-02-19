@@ -274,6 +274,9 @@ for offer in root.xpath("//offer"):
 
     offer_copy = copy.deepcopy(offer)
     offer_copy.attrib.pop("group_id", None)
+    url_node = offer_copy.find("url")
+    if url_node is not None:
+        offer_copy.remove(url_node)
 
     # артикул -> id
     vendor_code = offer_copy.findtext("vendorCode", "").strip()
