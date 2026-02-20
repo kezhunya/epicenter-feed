@@ -248,6 +248,45 @@ tree = ET.parse(str(EPICENTER_XML))
 root = tree.getroot()
 category_parent = {cat.get("id"): cat.get("parentId") for cat in root.xpath("//category")}
 
+COUNTRY_PARAM_NAMES = {
+    "страна регистрации бренда",
+    "країна реєстрації бренду",
+    "страна бренда",
+    "країна бренду",
+}
+
+COUNTRY_CODE_MAP = {
+    "украина": "ukr",
+    "україна": "ukr",
+    "польша": "pol",
+    "польща": "pol",
+    "китай": "chn",
+    "китай (кнр)": "chn",
+    "чехия": "cze",
+    "чехія": "cze",
+    "германия": "deu",
+    "німеччина": "deu",
+    "италия": "ita",
+    "італія": "ita",
+    "испания": "esp",
+    "іспанія": "esp",
+    "турция": "tur",
+    "туреччина": "tur",
+    "португалия": "prt",
+    "португалія": "prt",
+    "нидерланды": "nld",
+    "нідерланди": "nld",
+    "швейцария": "che",
+    "швейцарія": "che",
+    "румыния": "rou",
+    "румунія": "rou",
+    "болгария": "bgr",
+    "болгарія": "bgr",
+    "сербия": "srb",
+    "сербія": "srb",
+    "польща.": "pol",
+}
+
 
 def is_banned_category(category_id: str) -> bool:
     while category_id:
@@ -255,6 +294,21 @@ def is_banned_category(category_id: str) -> bool:
             return True
         category_id = category_parent.get(category_id)
     return False
+
+
+def find_param_value(offer: ET._Element, names: set[str]) -> str:
+    normalized_names = {name.strip().casefold() for name in names}
+    for param in offer.xpath(".//param"):
+        pname = (param.get("name") or "").strip().casefold()
+        if pname in normalized_names:
+            return (param.text or "").strip()
+    return ""
+
+
+def country_code_from_name(country_name: str) -> str:
+    normalized = country_name.strip().casefold()
+    normalized = normalized.replace(".", "")
+    return COUNTRY_CODE_MAP.get(normalized, "unk")
 
 
 new_root = ET.Element("yml_catalog", date=datetime.now().strftime("%Y-%m-%d %H:%M"))
@@ -291,6 +345,28 @@ for offer in root.xpath("//offer"):
 
     if offer_id:
         offer_copy.set("id", offer_id)
+
+    vendor_node = offer_copy.find("vendor")
+    if vendor_node is not None and vendor_code:
+        vendor_node.set("code", vendor_code)
+    for vendor_code_node in offer_copy.findall("vendorCode"):
+        offer_copy.remove(vendor_code_node)
+
+    country_name = find_param_value(offer_copy, COUNTRY_PARAM_NAMES)
+    if country_name:
+        country_code = country_code_from_name(country_name)
+        country_node = offer_copy.find("country_of_origin")
+        if country_node is None:
+            country_node = ET.Element("country_of_origin", code=country_code)
+            country_node.text = country_name
+            if vendor_node is not None:
+                vendor_index = list(offer_copy).index(vendor_node)
+                offer_copy.insert(vendor_index + 1, country_node)
+            else:
+                offer_copy.append(country_node)
+        else:
+            country_node.set("code", country_code)
+            country_node.text = country_name
 
     # обновляем цены и наличие из розетки
     if offer_id in rozetka_data:
