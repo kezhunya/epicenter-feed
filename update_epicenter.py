@@ -19,6 +19,7 @@ ROZETKA_XML = TMP_DIR / "rozetka.xml"
 EPICENTER_XML = TMP_DIR / "epicenter.xml"
 OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
 BRAND_CODES_JSON = Path(__file__).with_name("brand_codes_171.json")
+CATEGORY_PARAM_MAP_JSON = Path(__file__).with_name("category_param_map.json")
 
 # ===== ЧЁРНЫЕ СПИСКИ =====
 BANNED_VENDORS = {
@@ -314,6 +315,36 @@ def load_epicenter_dicts(path: Path) -> tuple[dict[str, str], dict[str, str]]:
 BRAND_CODE_MAP, COUNTRY_CODE_MAP_XLSX = load_epicenter_dicts(BRAND_CODES_JSON)
 
 
+def load_category_param_map(path: Path) -> dict[str, dict[str, str]]:
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    result = {}
+    for cat_id, cfg in (raw or {}).items():
+        if not isinstance(cfg, dict):
+            continue
+        name = str(cfg.get("name", "")).strip()
+        paramcode = str(cfg.get("paramcode", "")).strip()
+        value = str(cfg.get("value", "")).strip()
+        valuecode = str(cfg.get("valuecode", "")).strip()
+        if not (name and paramcode and value):
+            continue
+        result[str(cat_id).strip()] = {
+            "name": name,
+            "paramcode": paramcode,
+            "value": value,
+            "valuecode": valuecode,
+        }
+    return result
+
+
+CATEGORY_PARAM_MAP = load_category_param_map(CATEGORY_PARAM_MAP_JSON)
+
+
 def is_banned_category(category_id: str) -> bool:
     while category_id:
         if category_id in BANNED_CATEGORY_ROOTS:
@@ -355,6 +386,7 @@ mapped = 0
 unmapped = 0
 duplicate_ids_removed = 0
 seen_offer_ids = set()
+category_params_added = 0
 
 for offer in root.xpath("//offer"):
     vendor = offer.findtext("vendor", "").strip()
@@ -496,6 +528,16 @@ for offer in root.xpath("//offer"):
         if parent is not None:
             parent.remove(param)
 
+    # Подкатегория из исходника -> параметр Epicenter (через локальный маппинг)
+    param_cfg = CATEGORY_PARAM_MAP.get(src_category_id)
+    if param_cfg:
+        param_node = ET.Element("param", name=param_cfg["name"], paramcode=param_cfg["paramcode"])
+        if param_cfg["valuecode"]:
+            param_node.set("valuecode", param_cfg["valuecode"])
+        param_node.text = param_cfg["value"]
+        offer_copy.append(param_node)
+        category_params_added += 1
+
     new_offers.append(offer_copy)
 
 # ================== СОХРАНЕНИЕ ==================
@@ -513,6 +555,7 @@ message = f"""===== СТАРТ =====
 🧹 Удалено дублей по offer id: {duplicate_ids_removed}
 🗂 Сопоставлено категорий: {mapped}
 ⚠ Не найдено категорий в таблице: {unmapped}
+🧷 Добавлено параметров подкатегории: {category_params_added}
 📦 Отправляем на Эпицентр товаров: {len(new_offers.xpath('offer'))}
 ===== ГОТОВО ✅ ====="""
 
