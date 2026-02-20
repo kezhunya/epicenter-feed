@@ -16,6 +16,11 @@ DEFAULT_OUTPUT_XLSX = Path(__file__).with_name("epicenter_v2_summary.xlsx")
 DEFAULT_OUTPUT_JSON = Path(__file__).with_name("epicenter_v2_snapshot.json")
 
 
+def log(message: str) -> None:
+    ts = datetime.now().strftime("%H:%M:%S")
+    print(f"[{ts}] {message}", flush=True)
+
+
 def normalize_title(value: str) -> str:
     return re.sub(r"\s+", " ", (value or "").strip()).casefold()
 
@@ -63,7 +68,12 @@ class EpicenterClient:
             raise RuntimeError(f"Unexpected response for {path}: {type(data)}")
         return data
 
-    def get_paged(self, path: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    def get_paged(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        label: str | None = None,
+    ) -> list[dict[str, Any]]:
         params = dict(params or {})
         params.setdefault("page", 1)
         params.setdefault("per-page", 200)
@@ -78,6 +88,8 @@ class EpicenterClient:
 
             page = int(data.get("page") or params["page"])
             pages = int(data.get("pages") or page)
+            if label:
+                log(f"{label}: page {page}/{pages}, collected {len(items)}")
             if page >= pages:
                 break
             params["page"] = page + 1
@@ -212,8 +224,11 @@ def main() -> int:
     target_norm = {normalize_title(x): x for x in targets}
 
     client = EpicenterClient(args.token)
-    categories = client.get_paged("/v2/pim/categories")
+    log("Step 1/5: Fetch categories from /v2/pim/categories")
+    categories = client.get_paged("/v2/pim/categories", label="Categories")
+    log(f"Categories fetched: {len(categories)}")
 
+    log("Step 2/5: Match target category titles")
     category_matches: list[dict[str, Any]] = []
     unmatched = set(targets)
     for category in categories:
@@ -242,25 +257,35 @@ def main() -> int:
             if code
         }
     )
+    log(f"Matched categories: {len(category_matches)}; unique attribute sets: {len(attribute_set_codes)}")
 
+    log("Step 3/5: Fetch attribute sets")
     attr_sets_map: dict[str, dict[str, Any]] = {}
-    for chunk in chunked(attribute_set_codes, 50):
+    chunks = chunked(attribute_set_codes, 50)
+    for idx, chunk in enumerate(chunks, start=1):
+        log(f"Attribute sets batch {idx}/{len(chunks)}: requesting {len(chunk)} codes")
         params: list[tuple[str, str]] = [("page", "1"), ("per-page", "200")]
         for code in chunk:
             params.append(("filter[codes][]", code))
         data = client._get("/v2/pim/attribute-sets", params=params)
+        page_items = data.get("items") or []
+        log(f"Attribute sets batch {idx}/{len(chunks)}: received {len(page_items)} items")
         for item in data.get("items") or []:
             code = str(item.get("code", "")).strip()
             if code:
                 attr_sets_map[code] = item
+    log(f"Attribute sets loaded: {len(attr_sets_map)}")
 
     options_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
     attributes_rows: list[dict[str, Any]] = []
     options_rows: list[dict[str, Any]] = []
+    options_requests = 0
 
+    log("Step 4/5: Build rows and fetch options for select/multiselect attributes")
     for category in category_matches:
         cat_title = category["category_title"]
         cat_code = category["category_code"]
+        log(f"Category {cat_title} ({cat_code}) with {len(category['attribute_set_codes'])} attribute sets")
         for as_code in category["attribute_set_codes"]:
             attr_set = attr_sets_map.get(as_code) or {}
             for attr in (attr_set.get("attributes") or []):
@@ -298,7 +323,11 @@ def main() -> int:
                 cache_key = (as_code, attr_code)
                 if cache_key not in options_cache:
                     path = f"/v2/pim/attribute-sets/{as_code}/attributes/{attr_code}/options"
-                    options_cache[cache_key] = client.get_paged(path)
+                    options_requests += 1
+                    options_cache[cache_key] = client.get_paged(
+                        path,
+                        label=f"Options {options_requests}: {as_code}/{attr_code}",
+                    )
 
                 for opt in options_cache[cache_key]:
                     options_rows.append(
@@ -313,6 +342,7 @@ def main() -> int:
                         }
                     )
 
+    log("Step 5/5: Save workbook and snapshot")
     write_workbook(args.output_xlsx, targets, category_matches, attributes_rows, options_rows)
     snapshot = {
         "generated_at": datetime.utcnow().isoformat() + "Z",
@@ -325,14 +355,14 @@ def main() -> int:
     }
     args.output_json.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"Targets: {len(targets)}")
-    print(f"Matched categories: {len(category_matches)}")
-    print(f"Unmatched categories: {len(unmatched)}")
-    print(f"Attribute sets: {len(attribute_set_codes)}")
-    print(f"Attributes rows: {len(attributes_rows)}")
-    print(f"Options rows: {len(options_rows)}")
-    print(f"Saved: {args.output_xlsx}")
-    print(f"Saved: {args.output_json}")
+    log(f"Targets: {len(targets)}")
+    log(f"Matched categories: {len(category_matches)}")
+    log(f"Unmatched categories: {len(unmatched)}")
+    log(f"Attribute sets: {len(attribute_set_codes)}")
+    log(f"Attributes rows: {len(attributes_rows)}")
+    log(f"Options rows: {len(options_rows)}")
+    log(f"Saved: {args.output_xlsx}")
+    log(f"Saved: {args.output_json}")
     return 0
 
 
