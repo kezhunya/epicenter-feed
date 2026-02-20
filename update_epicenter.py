@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import os
 import shutil
 import time
@@ -311,6 +312,13 @@ def country_code_from_name(country_name: str) -> str:
     return COUNTRY_CODE_MAP.get(normalized, "unk")
 
 
+def vendor_code_from_name(vendor_name: str) -> str:
+    normalized = vendor_name.strip().casefold()
+    if not normalized:
+        return ""
+    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+
+
 new_root = ET.Element("yml_catalog", date=datetime.now().strftime("%Y-%m-%d %H:%M"))
 new_offers = ET.SubElement(new_root, "offers")
 
@@ -347,8 +355,10 @@ for offer in root.xpath("//offer"):
         offer_copy.set("id", offer_id)
 
     vendor_node = offer_copy.find("vendor")
-    if vendor_node is not None and vendor_code:
-        vendor_node.set("code", vendor_code)
+    if vendor_node is not None:
+        computed_vendor_code = vendor_code_from_name(vendor_node.text or "")
+        if computed_vendor_code:
+            vendor_node.set("code", computed_vendor_code)
     for vendor_code_node in offer_copy.findall("vendorCode"):
         offer_copy.remove(vendor_code_node)
 
