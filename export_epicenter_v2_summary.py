@@ -14,6 +14,7 @@ API_BASE = "https://api.epicentrm.com.ua"
 DEFAULT_TARGETS = Path(__file__).with_name("epicenter_target_categories.txt")
 DEFAULT_OUTPUT_XLSX = Path(__file__).with_name("epicenter_v2_summary.xlsx")
 DEFAULT_OUTPUT_JSON = Path(__file__).with_name("epicenter_v2_snapshot.json")
+DEFAULT_API_TOKEN = "5a6489d1a5c48c9d174bd31f2a0a8fd0"
 
 
 def log(message: str) -> None:
@@ -212,7 +213,11 @@ def main() -> int:
     parser.add_argument("--targets", type=Path, default=DEFAULT_TARGETS, help="Path to target categories txt")
     parser.add_argument("--output-xlsx", type=Path, default=DEFAULT_OUTPUT_XLSX, help="Result xlsx path")
     parser.add_argument("--output-json", type=Path, default=DEFAULT_OUTPUT_JSON, help="Raw snapshot json path")
-    parser.add_argument("--token", default=os.environ.get("EPICENTER_API_TOKEN", ""), help="Epicenter API token")
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("EPICENTER_API_TOKEN", DEFAULT_API_TOKEN),
+        help="Epicenter API token",
+    )
     args = parser.parse_args()
 
     if not args.targets.exists():
