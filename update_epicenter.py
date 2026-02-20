@@ -325,6 +325,22 @@ for offer in root.xpath("//offer"):
         description_ua.tag = "description"
         description_ua.set("lang", "ua")
 
+    # Epicenter не принимает currencyId в offer
+    for currency_node in offer_copy.findall("currencyId"):
+        offer_copy.remove(currency_node)
+
+    # Оборачиваем description в CDATA, чтобы HTML внутри не парсился как XML-разметка
+    for desc_node in offer_copy.findall("description"):
+        parts = []
+        if desc_node.text:
+            parts.append(desc_node.text)
+        for child in list(desc_node):
+            parts.append(ET.tostring(child, encoding="unicode"))
+            desc_node.remove(child)
+        desc_html = "".join(parts).strip()
+        if desc_html:
+            desc_node.text = ET.CDATA(desc_html)
+
     # oldprice -> price_old
     for oldprice_elem in offer_copy.xpath(".//oldprice"):
         oldprice_elem.tag = "price_old"
