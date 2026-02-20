@@ -1,5 +1,5 @@
 import copy
-import hashlib
+import json
 import os
 import shutil
 import time
@@ -18,6 +18,7 @@ TMP_DIR.mkdir(parents=True, exist_ok=True)
 ROZETKA_XML = TMP_DIR / "rozetka.xml"
 EPICENTER_XML = TMP_DIR / "epicenter.xml"
 OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
+BRAND_CODES_JSON = Path(__file__).with_name("brand_codes_171.json")
 
 # ===== ЧЁРНЫЕ СПИСКИ =====
 BANNED_VENDORS = {
@@ -289,6 +290,30 @@ COUNTRY_CODE_MAP = {
 }
 
 
+def load_epicenter_dicts(path: Path) -> tuple[dict[str, str], dict[str, str]]:
+    if not path.exists():
+        return {}, {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}, {}
+
+    brand = {
+        str(name).strip().casefold(): str(code).strip()
+        for name, code in (raw.get("brand") or {}).items()
+        if str(name).strip() and str(code).strip()
+    }
+    country = {
+        str(name).strip().casefold(): str(code).strip()
+        for name, code in (raw.get("country") or {}).items()
+        if str(name).strip() and str(code).strip()
+    }
+    return brand, country
+
+
+BRAND_CODE_MAP, COUNTRY_CODE_MAP_XLSX = load_epicenter_dicts(BRAND_CODES_JSON)
+
+
 def is_banned_category(category_id: str) -> bool:
     while category_id:
         if category_id in BANNED_CATEGORY_ROOTS:
@@ -309,6 +334,9 @@ def find_param_value(offer: ET._Element, names: set[str]) -> str:
 def country_code_from_name(country_name: str) -> str:
     normalized = country_name.strip().casefold()
     normalized = normalized.replace(".", "")
+    xlsx_code = COUNTRY_CODE_MAP_XLSX.get(normalized)
+    if xlsx_code:
+        return xlsx_code
     return COUNTRY_CODE_MAP.get(normalized, "unk")
 
 
@@ -316,7 +344,7 @@ def vendor_code_from_name(vendor_name: str) -> str:
     normalized = vendor_name.strip().casefold()
     if not normalized:
         return ""
-    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+    return BRAND_CODE_MAP.get(normalized, "")
 
 
 new_root = ET.Element("yml_catalog", date=datetime.now().strftime("%Y-%m-%d %H:%M"))
@@ -365,6 +393,8 @@ for offer in root.xpath("//offer"):
         computed_vendor_code = vendor_code_from_name(vendor_node.text or "")
         if computed_vendor_code:
             vendor_node.set("code", computed_vendor_code)
+        else:
+            vendor_node.attrib.pop("code", None)
     for vendor_code_node in offer_copy.findall("vendorCode"):
         offer_copy.remove(vendor_code_node)
 
