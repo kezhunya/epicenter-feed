@@ -325,6 +325,8 @@ new_offers = ET.SubElement(new_root, "offers")
 removed = 0
 mapped = 0
 unmapped = 0
+duplicate_ids_removed = 0
+seen_offer_ids = set()
 
 for offer in root.xpath("//offer"):
     vendor = offer.findtext("vendor", "").strip()
@@ -353,6 +355,10 @@ for offer in root.xpath("//offer"):
 
     if offer_id:
         offer_copy.set("id", offer_id)
+        if offer_id in seen_offer_ids:
+            duplicate_ids_removed += 1
+            continue
+        seen_offer_ids.add(offer_id)
 
     vendor_node = offer_copy.find("vendor")
     if vendor_node is not None:
@@ -474,6 +480,7 @@ message = f"""===== СТАРТ =====
 ▶ Загрузка: Эпицентр XML
 ✅ Эпицентр XML загружен
 ❌ Удалено из файла (левых) товаров: {removed}
+🧹 Удалено дублей по offer id: {duplicate_ids_removed}
 🗂 Сопоставлено категорий: {mapped}
 ⚠ Не найдено категорий в таблице: {unmapped}
 📦 Отправляем на Эпицентр товаров: {len(new_offers.xpath('offer'))}
