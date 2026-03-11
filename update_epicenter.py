@@ -28,6 +28,10 @@ ROZETKA_BACKUP_XML = BACKUP_DIR / "parserbiz_last.xml"
 EPICENTER_BACKUP_XML = BACKUP_DIR / "epicenter_last.xml"
 ROZETKA_BACKUP_CANDIDATES = [ROZETKA_BACKUP_XML, ROZETKA_XML]
 EPICENTER_BACKUP_CANDIDATES = [EPICENTER_BACKUP_XML, EPICENTER_XML]
+LOCAL_ENV_CANDIDATES = [
+    Path(__file__).resolve().parent / ".env",
+    Path(__file__).resolve().parent.parent / ".env",
+]
 
 # ===== ЧЁРНЫЕ СПИСКИ =====
 BANNED_VENDORS = {
@@ -201,6 +205,26 @@ CATEGORY_MAPPING = {
 }
 
 # ================== TELEGRAM ==================
+def load_local_env(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip("'").strip('"')
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except Exception as exc:
+        print(f"⚠ Не удалось прочитать .env ({path}): {exc}")
+
+
+for env_path in LOCAL_ENV_CANDIDATES:
+    load_local_env(env_path)
+
 TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
