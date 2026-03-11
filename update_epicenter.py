@@ -22,6 +22,12 @@ EPICENTER_XML = TMP_DIR / "epicenter.xml"
 OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
 BRAND_CODES_JSON = Path(__file__).with_name("brand_codes_171.json")
 CATEGORY_PARAM_MAP_JSON = Path(__file__).with_name("category_param_map.json")
+BACKUP_DIR = Path(__file__).with_name("backups")
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+ROZETKA_BACKUP_XML = BACKUP_DIR / "parserbiz_last.xml"
+EPICENTER_BACKUP_XML = BACKUP_DIR / "epicenter_last.xml"
+ROZETKA_BACKUP_CANDIDATES = [ROZETKA_BACKUP_XML, ROZETKA_XML]
+EPICENTER_BACKUP_CANDIDATES = [EPICENTER_BACKUP_XML, EPICENTER_XML]
 
 # ===== ЧЁРНЫЕ СПИСКИ =====
 BANNED_VENDORS = {
@@ -232,19 +238,77 @@ def download_file(url: str, path: Path, title: str, retries: int = 5, timeout: i
             time.sleep(5)
 
 
+def backup_date_str(path: Path | None) -> str:
+    if path is None:
+        return datetime.now().strftime("%d.%m.%Y")
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime).strftime("%d.%m.%Y")
+    except Exception:
+        return datetime.now().strftime("%d.%m.%Y")
+
+
+def source_status_block(title: str, loaded_from_source: bool, backup_path: Path | None = None) -> str:
+    if loaded_from_source:
+        return f"▶ Загрузка: {title}\n✅ {title} загружен"
+    return f"⛔️ {title} не загружен - взят из backup ({backup_date_str(backup_path)})"
+
+
+def resolve_valid_backup(candidates: list[Path]) -> Path | None:
+    for candidate in candidates:
+        if not candidate.exists() or candidate.stat().st_size == 0:
+            continue
+        try:
+            ET.parse(str(candidate))
+        except Exception:
+            continue
+        return candidate
+    return None
+
+
 print("\n===== СТАРТ =====\n")
-download_file(
-    ROZETKA_URL,
-    ROZETKA_XML,
-    "Розетка XML",
-    timeout=ROZETKA_DOWNLOAD_TIMEOUT_SEC,
-)
-download_file(
-    EPICENTER_URL,
-    EPICENTER_XML,
-    "Эпицентр XML",
-    timeout=EPICENTER_DOWNLOAD_TIMEOUT_SEC,
-)
+rozetka_loaded_from_source = True
+rozetka_fallback_path: Path | None = None
+try:
+    download_file(
+        ROZETKA_URL,
+        ROZETKA_XML,
+        "Розетка XML",
+        timeout=ROZETKA_DOWNLOAD_TIMEOUT_SEC,
+    )
+    shutil.copy2(ROZETKA_XML, ROZETKA_BACKUP_XML)
+except Exception as exc:
+    backup = resolve_valid_backup(ROZETKA_BACKUP_CANDIDATES)
+    if backup is None:
+        raise exc
+    rozetka_loaded_from_source = False
+    rozetka_fallback_path = backup
+    if backup.resolve() != ROZETKA_XML.resolve():
+        shutil.copy2(backup, ROZETKA_XML)
+    if backup.resolve() != ROZETKA_BACKUP_XML.resolve():
+        shutil.copy2(backup, ROZETKA_BACKUP_XML)
+    print(f"⚠ Розетка недоступна, используем backup: {backup}")
+
+epicenter_loaded_from_source = True
+epicenter_fallback_path: Path | None = None
+try:
+    download_file(
+        EPICENTER_URL,
+        EPICENTER_XML,
+        "Эпицентр XML",
+        timeout=EPICENTER_DOWNLOAD_TIMEOUT_SEC,
+    )
+    shutil.copy2(EPICENTER_XML, EPICENTER_BACKUP_XML)
+except Exception as exc:
+    backup = resolve_valid_backup(EPICENTER_BACKUP_CANDIDATES)
+    if backup is None:
+        raise exc
+    epicenter_loaded_from_source = False
+    epicenter_fallback_path = backup
+    if backup.resolve() != EPICENTER_XML.resolve():
+        shutil.copy2(backup, EPICENTER_XML)
+    if backup.resolve() != EPICENTER_BACKUP_XML.resolve():
+        shutil.copy2(backup, EPICENTER_BACKUP_XML)
+    print(f"⚠ Эпицентр недоступен, используем backup: {backup}")
 
 # ================== РОЗЕТКА ==================
 rozetka_data = {}
@@ -554,21 +618,27 @@ for offer in root.xpath("//offer"):
 
 # ================== СОХРАНЕНИЕ ==================
 tree_new = ET.ElementTree(new_root)
-tree_new.write(str(OUTPUT_XML), encoding="UTF-8", xml_declaration=True, pretty_print=True)
+tree_new.write(str(OUTPUT_XML), encoding="UTF-8", xml_declaration=True, pretty_print=False)
 shutil.copy2(OUTPUT_XML, Path.cwd() / "update_epicenter.xml")
+size_mb = OUTPUT_XML.stat().st_size / (1024 * 1024)
 
 # ================== TELEGRAM ==================
+source_header = "\n".join(
+    [
+        source_status_block("Розетка XML", rozetka_loaded_from_source, rozetka_fallback_path),
+        source_status_block("Эпицентр XML", epicenter_loaded_from_source, epicenter_fallback_path),
+    ]
+)
+
 message = f"""===== СТАРТ =====
-▶ Загрузка: Розетка XML
-✅ Розетка XML загружен
-▶ Загрузка: Эпицентр XML
-✅ Эпицентр XML загружен
+{source_header}
 ❌ Удалено из файла (левых) товаров: {removed}
 🧹 Удалено дублей по offer id: {duplicate_ids_removed}
 🗂 Сопоставлено категорий: {mapped}
 ⚠ Не найдено категорий в таблице: {unmapped}
 🧷 Добавлено параметров подкатегории: {category_params_added}
 📦 Отправляем на Эпицентр товаров: {len(new_offers.xpath('offer'))}
+📐 Размер итогового файла: {size_mb:.2f} MB
 ===== ГОТОВО ✅ ====="""
 
 send_telegram(message)
