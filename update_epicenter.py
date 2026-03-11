@@ -659,13 +659,15 @@ source_header = "\n".join(
     ]
 )
 
-message = f"""===== СТАРТ =====
+message = f"""===== 🛠ЭПИЦЕНТР🛠=====
 {source_header}
+
 ❌ Удалено из файла (левых) товаров: {removed}
-🧹 Удалено дублей по offer id: {duplicate_ids_removed}
+🆔 Удалено дублей по offer id: {duplicate_ids_removed}
 🗂 Сопоставлено категорий: {mapped}
 ⚠ Не найдено категорий в таблице: {unmapped}
 🧷 Добавлено параметров подкатегории: {category_params_added}
+
 📦 Отправляем на Эпицентр товаров: {len(new_offers.xpath('offer'))}
 📐 Размер итогового файла: {size_mb:.2f} MB
 ===== ГОТОВО ✅ ====="""
