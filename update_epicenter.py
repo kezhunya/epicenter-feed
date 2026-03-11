@@ -5,6 +5,7 @@ import shutil
 import time
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 from lxml import etree as ET
@@ -277,6 +278,10 @@ def source_status_block(title: str, loaded_from_source: bool, backup_path: Path 
     return f"⛔️ {title} не загружен - взят из backup ({backup_date_str(backup_path)})"
 
 
+def now_kyiv() -> datetime:
+    return datetime.now(ZoneInfo("Europe/Kyiv"))
+
+
 def resolve_valid_backup(candidates: list[Path]) -> Path | None:
     for candidate in candidates:
         if not candidate.exists() or candidate.stat().st_size == 0:
@@ -478,7 +483,7 @@ def vendor_code_from_name(vendor_name: str) -> str:
     return BRAND_CODE_MAP.get(normalized, "")
 
 
-new_root = ET.Element("yml_catalog", date=datetime.now().strftime("%Y-%m-%d %H:%M"))
+new_root = ET.Element("yml_catalog", date=now_kyiv().strftime("%Y-%m-%d %H:%M"))
 new_offers = ET.SubElement(new_root, "offers")
 
 removed = 0
