@@ -12,6 +12,8 @@ from lxml import etree as ET
 # ================== НАСТРОЙКИ ==================
 ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
 EPICENTER_URL = "https://aqua-favorit.com.ua/content/export/e8965786f1dc7b09ba9950b66c9f7fba.xml"
+ROZETKA_DOWNLOAD_TIMEOUT_SEC = int(os.environ.get("ROZETKA_DOWNLOAD_TIMEOUT_SEC", "240"))
+EPICENTER_DOWNLOAD_TIMEOUT_SEC = int(os.environ.get("EPICENTER_DOWNLOAD_TIMEOUT_SEC", "180"))
 
 TMP_DIR = Path("/tmp/epicenter_feed")
 TMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -231,8 +233,18 @@ def download_file(url: str, path: Path, title: str, retries: int = 5, timeout: i
 
 
 print("\n===== СТАРТ =====\n")
-download_file(ROZETKA_URL, ROZETKA_XML, "Розетка XML")
-download_file(EPICENTER_URL, EPICENTER_XML, "Эпицентр XML")
+download_file(
+    ROZETKA_URL,
+    ROZETKA_XML,
+    "Розетка XML",
+    timeout=ROZETKA_DOWNLOAD_TIMEOUT_SEC,
+)
+download_file(
+    EPICENTER_URL,
+    EPICENTER_XML,
+    "Эпицентр XML",
+    timeout=EPICENTER_DOWNLOAD_TIMEOUT_SEC,
+)
 
 # ================== РОЗЕТКА ==================
 rozetka_data = {}
