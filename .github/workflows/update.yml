@@ -3,11 +3,9 @@ name: Update Epicenter XML
 # ================== Расписание ==================
 on:
   schedule:
-    # Cron по UTC для времени Kyiv (зима UTC+2)
-    - cron: '0 22 * * *'   # 00:00 Kyiv
-    - cron: '0 7 * * *'    # 09:00 Kyiv
-    - cron: '0 11 * * *'   # 13:00 Kyiv
-    - cron: '0 18 * * *'   # 20:00 Kyiv
+    # Auto-generated from Configurator. Times are Europe/Kyiv; GitHub cron is UTC (current UTC+3).
+    - cron: '0 6 * * *'    # 09:00 Kyiv
+    - cron: '0 17 * * *'   # 20:00 Kyiv
   workflow_dispatch:        # возможность запускать вручную
 
 jobs:
