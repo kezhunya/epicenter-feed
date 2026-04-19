@@ -35,12 +35,13 @@ TMP_DIR = Path("/tmp/epicenter_feed")
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 ROZETKA_XML = TMP_DIR / "rozetka.xml"
 EPICENTER_XML = TMP_DIR / "epicenter.xml"
-OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
+TMP_OUTPUT_XML = TMP_DIR / "update_epicenter.xml"
+OUTPUT_XML = Path(__file__).resolve().parent / "update_epicenter.xml"
 BRAND_CODES_JSON = Path(__file__).with_name("brand_codes_171.json")
 CATEGORY_PARAM_MAP_JSON = Path(__file__).with_name("category_param_map.json")
-OSTATKI_DIR = Path("/Volumes/X-Files/Загрузки рабочие/Остатки")
+OSTATKI_DIR = Path(os.environ.get("OSTATKI_DIR", "/Volumes/X-Files/Загрузки рабочие/Остатки"))
 SOURCE_ISSUES_XLSX = OSTATKI_DIR / "Проблема исходников.xlsx"
-BACKUP_DIR = OSTATKI_DIR / "Backup"
+BACKUP_DIR = Path(os.environ.get("SHARED_BACKUP_DIR", str(OSTATKI_DIR / "Backup")))
 LEGACY_BACKUP_DIR = Path(__file__).with_name("backups")
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 LEGACY_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -1032,8 +1033,8 @@ for offer in root.xpath("//offer"):
 
 # ================== СОХРАНЕНИЕ ==================
 tree_new = ET.ElementTree(new_root)
-tree_new.write(str(OUTPUT_XML), encoding="UTF-8", xml_declaration=True, pretty_print=False)
-shutil.copy2(OUTPUT_XML, Path.cwd() / "update_epicenter.xml")
+tree_new.write(str(TMP_OUTPUT_XML), encoding="UTF-8", xml_declaration=True, pretty_print=False)
+shutil.copy2(TMP_OUTPUT_XML, OUTPUT_XML)
 size_mb = OUTPUT_XML.stat().st_size / (1024 * 1024)
 
 # ================== TELEGRAM ==================
