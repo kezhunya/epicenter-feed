@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<yml_catalog date="2026-10-20 12:12"><offers><offer id="000013599" available="true">
+<yml_catalog date="2026-10-20 17:20"><offers><offer id="000013599" available="true">
     <price>2730</price>
     <picture>https://aqua-favorit.com.ua/content/images/21/23675523164914_+c23811fe49.jpeg</picture>
     <category code="993">Змішувачі</category><attribute_set code="993">Змішувачі</attribute_set><picture>https://aqua-favorit.com.ua/content/images/21/18847293812079_+890b2ae880.jpeg</picture>
@@ -154800,7 +154800,7 @@
     <description lang="ua"><![CDATA[<p>Насос дренажний Koer KDP-750 PRO KP2971</p> <p><strong>Характеристики :</strong></p> <p>Од. в упак. : 457<br />Вага ящ. : 19.2<br />MAX продуктивність (при мін. напорі) (м3/год) : 13500,00<br />Максимальний напір (м) : 8<br />Матеріал виробу : Пластик<br />Частота струму (Гц) : 50<br />Якість води : Чиста або слабозабруднена<br />Швидкість (об/хв) : 2850<br />Матеріал вала двигуна : Нержавіюча сталь<br />Матеріал обмотки статора : Мідь<br />Тип ротора : Сухий<br />Напруга мережі (V) : 230<br />Захист від перегріву (Вбудований датчик перегріву) : Так<br />Тип приєднання : Шлангове<br />Мін. температура навколишнього середовища ( C) : 5<br />Перекачувальні середовища : Прісна вода<br />MAX продуктивність (при мінімальн. напорі) (л/хв) : 225,00<br />Матеріал робочого колеса : Пластик<br />Продуктивність (л/хв) : 225,00<br />Мінімальна температура робочої рідини ( C) : 4<br />Максимальна глибина занурення (м) : 4<br />Максимальна температура робочої рідини ( C) : 40<br />Торгова марка : Koer<br />Тип : Відцентровий<br />Тип виробу : Дренажний насос<br />Діаметр виходу 2 (мм) : 32<br />Діаметр виходу 1 (мм) : 25<br />Довжина кабелю (м) : 10,00<br />Діаметр виходу 3 (мм) : 40</p>]]></description>
     </offer>
    <offer id="KP2767" available="true">
-    <price>6110</price>
+    <price>5750</price>
     <picture>https://aqua-favorit.com.ua/content/images/28/25873305735859_+93aa6d1add.png</picture>
     <category code="1666">Водопровідні насоси</category><attribute_set code="1666">Водопровідні насоси</attribute_set><picture>https://aqua-favorit.com.ua/content/images/28/25138829288850_+6e5d3e5b7c.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/28/55594240619791_+e18788344c.jpg</picture>
@@ -171210,7 +171210,7 @@
     <description lang="ua"><![CDATA[<p>Кран кульовий Roho R116-050 -1/2"x1/2" Вз кутовий Н/Г, ручка "метелик" червона RO0235</p> <p><strong>Характеристики :</strong></p> <p>Од. в упак. : 120<br />Тип з'єднання : Внутрішня-зовнішня<br />Матеріал кульового затвора : Латунь<br />Матеріал виробу : Латунь CW617N нікельована<br />Тип приєднання : Різьбове<br />Шар : Латунний<br />Максимальний робочий тиск (бар) : 25<br />Тип виробу : Крани кульові<br />Призначення : Для води<br />Вид виробу : Кран з накидною гайкою<br />Модель : R116-050<br />Країна бренду : Італія<br />Тип : Кутовий<br />Торгова марка : Roho<br />Країна виробник : Італія<br />Діаметр підключення (дюйм) : 1/2<br />H (мм) : 73,00<br />B (мм) : 34,75<br />D (мм) : 52,50<br />C (мм) : 31,50<br />L (мм) : 65,00<br />Максимальна температура робочої рідини ( C) : 130<br />Гарантійний період (міс) : 24<br />Тип ручки : Метелик<br />Колір : Сталевий<br />Покриття : Нікель</p>]]></description>
     </offer>
    <offer id="KP0138" available="true">
-    <price>106</price>
+    <price>95</price>
     <picture>https://aqua-favorit.com.ua/content/images/48/12457416542594_+e4159cdb8b.png</picture>
     <category code="6906">Фітинги різьбові</category><attribute_set code="6906">Фітинги різьбові</attribute_set><picture>https://aqua-favorit.com.ua/content/images/48/52697026878479_+b9538bb600.jpg</picture>
     <vendor code="d32b186dd61111e580d942f2e9bc64ff">Koer</vendor>
