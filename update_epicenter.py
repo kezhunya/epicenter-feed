@@ -14,7 +14,7 @@ from lxml import etree as ET
 from openpyxl import Workbook
 
 # ================== НАСТРОЙКИ ==================
-ROZETKA_URL = "http://parser.biz.ua/Aqua/api/export.aspx?action=rozetka&key=ui82P2VotQQamFTj512NQJK3HOlKvyv7"
+ROZETKA_URL = "https://feeds.aqua-favorit.com.ua/aquafavorit_rozetka.xml"
 EPICENTER_URL = "https://aqua-favorit.com.ua/content/export/e8965786f1dc7b09ba9950b66c9f7fba.xml"
 GOOGLE_TABLE_CSV_URL = (
     "https://docs.google.com/spreadsheets/d/"
@@ -45,16 +45,15 @@ BACKUP_DIR = Path(os.environ.get("SHARED_BACKUP_DIR", str(OSTATKI_DIR / "Backup"
 LEGACY_BACKUP_DIR = Path(__file__).with_name("backups")
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 LEGACY_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-ROZETKA_BACKUP_XML = BACKUP_DIR / "parserbiz_last.xml"
+ROZETKA_BACKUP_XML = BACKUP_DIR / "new_parser_last.xml"
 EPICENTER_BACKUP_XML = BACKUP_DIR / "epicenter_source_last.xml"
 GOOGLE_TABLE_BACKUP_CSV = BACKUP_DIR / "google_table_last.csv"
 GOOGLE_SETTINGS_BACKUP_JSON = BACKUP_DIR / "google_settings_last.json"
-LEGACY_ROZETKA_BACKUP_XML = LEGACY_BACKUP_DIR / "parserbiz_last.xml"
 LEGACY_EPICENTER_BACKUP_XML = LEGACY_BACKUP_DIR / "epicenter_last.xml"
 LEGACY_GOOGLE_TABLE_BACKUP_CSV = LEGACY_BACKUP_DIR / "google_table_last.csv"
 LEGACY_GOOGLE_SETTINGS_BACKUP_JSON = LEGACY_BACKUP_DIR / "google_settings_last.json"
 SOURCES_STATE_JSON = BACKUP_DIR / "sources_state_epicenter.json"
-ROZETKA_BACKUP_CANDIDATES = [ROZETKA_BACKUP_XML, LEGACY_ROZETKA_BACKUP_XML, ROZETKA_XML]
+ROZETKA_BACKUP_CANDIDATES = [ROZETKA_BACKUP_XML]
 EPICENTER_BACKUP_CANDIDATES = [EPICENTER_BACKUP_XML, LEGACY_EPICENTER_BACKUP_XML, EPICENTER_XML]
 GOOGLE_TABLE_BACKUP_CANDIDATES = [GOOGLE_TABLE_BACKUP_CSV, LEGACY_GOOGLE_TABLE_BACKUP_CSV]
 GOOGLE_SETTINGS_BACKUP_CANDIDATES = [GOOGLE_SETTINGS_BACKUP_JSON, LEGACY_GOOGLE_SETTINGS_BACKUP_JSON]
@@ -653,7 +652,7 @@ try:
         timeout=ROZETKA_DOWNLOAD_TIMEOUT_SEC,
     )
     shutil.copy2(ROZETKA_XML, ROZETKA_BACKUP_XML)
-    update_source_success(sources_state, "parserbiz", ROZETKA_XML)
+    update_source_success(sources_state, "new_parser", ROZETKA_XML)
 except Exception as exc:
     backup = resolve_valid_backup(ROZETKA_BACKUP_CANDIDATES)
     if backup is None:
@@ -664,7 +663,7 @@ except Exception as exc:
         shutil.copy2(backup, ROZETKA_XML)
     if backup.resolve() != ROZETKA_BACKUP_XML.resolve():
         shutil.copy2(backup, ROZETKA_BACKUP_XML)
-    update_source_failure(sources_state, "parserbiz")
+    update_source_failure(sources_state, "new_parser")
     print(f"⚠ Розетка недоступна, используем backup: {backup}")
 
 epicenter_loaded_from_source = True
@@ -699,14 +698,14 @@ for offer in tree_r.xpath("//offer"):
     if rid:
         rozetka_data[rid] = {
             "price": offer.findtext("price", "").strip(),
-            "old_price": offer.findtext("oldprice", "").strip(),
+            "old_price": (offer.findtext("price_old") or offer.findtext("oldprice") or "").strip(),
             "available": offer.get("available", "").strip(),
         }
 google_table_idx, _google_loaded_from_source, _google_fallback_path = load_google_table_index(sources_state)
 save_sources_state(sources_state)
 stale_issue_rows: list[dict] = []
 stale_defs = [
-    ("parserbiz", "Исходник Parser.biz", resolve_valid_backup(ROZETKA_BACKUP_CANDIDATES), "parserbiz_last.xml"),
+    ("new_parser", "Исходник New Parser", resolve_valid_backup(ROZETKA_BACKUP_CANDIDATES), "new_parser_last.xml"),
     ("epicenter_source", "Исходник Epicenter", resolve_valid_backup(EPICENTER_BACKUP_CANDIDATES), "epicenter_source_last.xml"),
     ("google_sheet", "Google Sheet", resolve_existing_backup(GOOGLE_TABLE_BACKUP_CANDIDATES), "google_table_last.csv"),
 ]
