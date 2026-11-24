@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<yml_catalog date="2026-11-24 12:10"><offers><offer id="000013599" available="true">
+<yml_catalog date="2026-11-24 22:06"><offers><offer id="000013599" available="true">
     <price>2730</price>
     <picture>https://aqua-favorit.com.ua/content/images/21/23675523164914_+c23811fe49.jpeg</picture>
     <category code="993">Змішувачі</category><attribute_set code="993">Змішувачі</attribute_set><picture>https://aqua-favorit.com.ua/content/images/21/18847293812079_+890b2ae880.jpeg</picture>
@@ -80523,10 +80523,9 @@
     <description lang="ua"><![CDATA[<p>Qtap HY3 (Nando) комплект арматури для бачка унітазу з подвійною круглою кнопкою змиву 4,8 см та клапаном нижньої подачі води, 3/6L CHR, забезпечує високу ефективність та економію води.</p><p><strong>Характеристики :</strong></p><p>Артикул : QT066HY3CHR<br /> Бренд : Qtap<br /> Вага нетто, кг : 1<br /> Гарантія : 200000 циклів<br /> Діаметр підключення : 1/2"<br /> <em><strong>Комплектація :</strong></em> Зливна арматура, клапан подачі води.<br /> Країна реєстрації бренду : Чехія<br /> Країна-виробник : Чехія<br /> Кількість вантажних місць : 1<br /> Призначення : Для унітаза<br /> Пропускна здатність, л/хв : 3/6<br /> Серія : HY3<br /> Тип виробу : Арматура для унітазу</p>]]></description>
     </offer>
    <offer id="SD00052533" available="true">
-    <price_old>1019</price_old>
     <price>867</price>
-    <category code="988">Дзеркала для ванної кімнати</category><attribute_set code="988">Дзеркала для ванної кімнати</attribute_set><picture>https://aqua-favorit.com.ua/content/images/1/26739730042921_+908ad04fd1.jpg</picture>
-    <picture>https://aqua-favorit.com.ua/content/images/1/55796456118465_+b5f3b3850b.jpg</picture>
+    <picture>https://aqua-favorit.com.ua/content/images/1/26739730042921_+908ad04fd1.jpg</picture>
+    <category code="988">Дзеркала для ванної кімнати</category><attribute_set code="988">Дзеркала для ванної кімнати</attribute_set><picture>https://aqua-favorit.com.ua/content/images/1/55796456118465_+b5f3b3850b.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/1/32989026102518_+e9df8aed68.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/1/85925593999659_+c67d681f6b.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/1/27670360673057_+2eabc03970.jpg</picture>
@@ -120375,7 +120374,7 @@
     </offer>
    <offer id="042420" available="true">
     <price_old>12471</price_old>
-    <price>8106</price>
+    <price>9977</price>
     <category code="4600">Мийки для кухні</category><attribute_set code="4600">Мийки для кухні</attribute_set><picture>https://aqua-favorit.com.ua/content/images/20/78104621597723_+26461731ae.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/20/78751425099114_+84088cdbc9.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/20/12354638018468_+8d30b7355c.jpg</picture>
@@ -120393,7 +120392,7 @@
     </offer>
    <offer id="042520" available="true">
     <price_old>13273</price_old>
-    <price>8627</price>
+    <price>10618</price>
     <category code="4600">Мийки для кухні</category><attribute_set code="4600">Мийки для кухні</attribute_set><picture>https://aqua-favorit.com.ua/content/images/21/97663031290300_+894bf97110.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/21/76470272998412_+88fc953e72.jpg</picture>
     <picture>https://aqua-favorit.com.ua/content/images/21/52004179264462_+abcf32ffed.jpg</picture>
